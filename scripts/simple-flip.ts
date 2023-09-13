@@ -103,14 +103,14 @@ interface CostReceipt {
         cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
       });
     }
-  }
-
-  if (!switchboardFunction) {
+  } else {
     if (!process.env.DOCKERHUB_IMAGE_NAME) {
       throw new Error(
         `You need to set DOCKERHUB_IMAGE_NAME in your .env file to create a new Switchboard Function. Example:\n\tDOCKERHUB_IMAGE_NAME=gallynaut/solana-simple-randomness-function`
       );
     }
+
+    // Get the Attestation queue address from the clusters genesis hash
     const genesisHash = await provider.connection.getGenesisHash();
     const attestationQueueAddress =
       genesisHash === MAINNET_GENESIS_HASH

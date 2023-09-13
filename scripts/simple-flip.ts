@@ -317,42 +317,29 @@ interface CostReceipt {
       )) / anchor.web3.LAMPORTS_PER_SOL,
   });
 
-  const switchboardFunctionCost = attestationQueueState.reward;
-
-  // The Switchboard Request Account contains a Vec<u8> for the params. When initializing this account
-  // we default to storing 512 bytes if not provided. You can decrease this value in
-  // programs/super-simple-randomness/src/lib.rs, as seen belo
-  //  request_init_ctx.invoke(
-  //   ctx.accounts.switchboard.clone(),
-  //   None,
-  //   Some(1000), // slots_until_expiration
-  //   Some(512), <--- here
-  //   Some(request_params.into_bytes()),
-  //   None,
-  //   None,
-  //   )?;
-  const switchboardRequestAccountInfo =
-    await program.provider.connection.getAccountInfo(
-      switchboardRequest.publicKey
-    );
-  const switchboardRequestAccountCost =
-    await program.provider.connection.getMinimumBalanceForRentExemption(
-      switchboardRequestAccountInfo.data.length
-    );
-
   const payerBalanceDelta =
     (startingPayerBalance -
       (await program.provider.connection.getBalance(payer.publicKey))) /
     anchor.web3.LAMPORTS_PER_SOL;
-
   console.log(
     `Payer Balance \u0394: ${chalk.red(`- ${payerBalanceDelta}`)} SOL`
   );
+
+  const switchboardFunctionCost = attestationQueueState.reward;
   console.log(
     `Switchboard Fee: ${
       switchboardFunctionCost / anchor.web3.LAMPORTS_PER_SOL
     } SOL (per request)`
   );
+
+  const switchboardRequestAccountCost =
+    await program.provider.connection.getMinimumBalanceForRentExemption(
+      (
+        await program.provider.connection.getAccountInfo(
+          switchboardRequest.publicKey
+        )
+      ).data.length
+    );
   console.log(
     `Request Account Rent: ${
       switchboardRequestAccountCost / anchor.web3.LAMPORTS_PER_SOL

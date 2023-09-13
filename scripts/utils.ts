@@ -1,6 +1,8 @@
 import {
   AttestationQueueAccount,
+  DEVNET_GENESIS_HASH,
   FunctionAccount,
+  MAINNET_GENESIS_HASH,
   SwitchboardProgram,
   attestationTypes,
 } from "@switchboard-xyz/solana.js";
@@ -15,6 +17,27 @@ import path from "path";
 import dotenv from "dotenv";
 import chalk from "chalk";
 dotenv.config();
+
+export async function loadDefaultQueue(switchboardProgram: SwitchboardProgram) {
+  const genesisHash =
+    await switchboardProgram.provider.connection.getGenesisHash();
+  const attestationQueueAddress =
+    genesisHash === MAINNET_GENESIS_HASH
+      ? "2ie3JZfKcvsRLsJaP5fSo43gUo1vsurnUAtAgUdUAiDG"
+      : genesisHash === DEVNET_GENESIS_HASH
+      ? "CkvizjVnm2zA5Wuwan34NhVT3zFc7vqUyGnA6tuEF5aE"
+      : undefined;
+  if (!attestationQueueAddress) {
+    throw new Error(
+      `The request script currently only works on mainnet-beta or devnet (if SWITCHBOARD_FUNCTION_PUBKEY is not set in your .env file))`
+    );
+  }
+
+  return new AttestationQueueAccount(
+    switchboardProgram,
+    attestationQueueAddress
+  );
+}
 
 export const myMrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   ? parseRawMrEnclave(process.env.MR_ENCLAVE)

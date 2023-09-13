@@ -1,25 +1,22 @@
 import {
   AttestationQueueAccount,
-  DEVNET_GENESIS_HASH,
   FunctionAccount,
   FunctionRequestAccount,
-  MAINNET_GENESIS_HASH,
   SwitchboardProgram,
   attestationTypes,
   loadKeypair,
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
 import { SuperSimpleRandomness } from "../target/types/super_simple_randomness";
-import {
-  jsonReplacers,
-  parseRawMrEnclave,
-  promiseWithTimeout,
-} from "@switchboard-xyz/common";
-import fs from "fs";
-import path from "path";
+import { jsonReplacers, promiseWithTimeout } from "@switchboard-xyz/common";
 import dotenv from "dotenv";
 import chalk from "chalk";
-import { addMrEnclave, loadSwitchboardFunctionEnv, myMrEnclave } from "./utils";
+import {
+  addMrEnclave,
+  loadSwitchboardFunctionEnv,
+  myMrEnclave,
+  loadDefaultQueue,
+} from "./utils";
 dotenv.config();
 
 interface UserGuessSettledEvent {
@@ -104,6 +101,7 @@ interface CostReceipt {
       });
     }
   } else {
+    // Create a new Switchboard Function
     if (!process.env.DOCKERHUB_IMAGE_NAME) {
       throw new Error(
         `You need to set DOCKERHUB_IMAGE_NAME in your .env file to create a new Switchboard Function. Example:\n\tDOCKERHUB_IMAGE_NAME=gallynaut/solana-simple-randomness-function`
@@ -111,23 +109,7 @@ interface CostReceipt {
     }
 
     // Get the Attestation queue address from the clusters genesis hash
-    const genesisHash = await provider.connection.getGenesisHash();
-    const attestationQueueAddress =
-      genesisHash === MAINNET_GENESIS_HASH
-        ? "2ie3JZfKcvsRLsJaP5fSo43gUo1vsurnUAtAgUdUAiDG"
-        : genesisHash === DEVNET_GENESIS_HASH
-        ? "CkvizjVnm2zA5Wuwan34NhVT3zFc7vqUyGnA6tuEF5aE"
-        : undefined;
-    if (!attestationQueueAddress) {
-      throw new Error(
-        `The request script currently only works on mainnet-beta or devnet (if SWITCHBOARD_FUNCTION_PUBKEY is not set in your .env file))`
-      );
-    }
-
-    attestationQueue = new AttestationQueueAccount(
-      switchboardProgram,
-      attestationQueueAddress
-    );
+    attestationQueue = await loadDefaultQueue(switchboardProgram);
 
     console.log(`Initializing new SwitchboardFunction ...`);
     let functionInitTx: string;
@@ -153,19 +135,21 @@ interface CostReceipt {
 
     // Log the txn signatures and add the cost receipts for easier debugging
     console.log(`[TX] function_init: ${functionInitTx}`);
-    costReceipts.push({
-      name: "FunctionAccount - rent",
-      description: "Rent exemption for the Switchboard FunctionAccount",
-      cost:
-        (await program.provider.connection.getMinimumBalanceForRentExemption(
-          switchboardProgram.attestationAccount.functionAccountData.size
-        )) / anchor.web3.LAMPORTS_PER_SOL,
-    });
-    costReceipts.push({
-      name: "function_init",
-      description: "Transaction fee to create the function account",
-      cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
-    });
+    costReceipts.push(
+      {
+        name: "FunctionAccount - rent",
+        description: "Rent exemption for the Switchboard FunctionAccount",
+        cost:
+          (await program.provider.connection.getMinimumBalanceForRentExemption(
+            switchboardProgram.attestationAccount.functionAccountData.size
+          )) / anchor.web3.LAMPORTS_PER_SOL,
+      },
+      {
+        name: "function_init",
+        description: "Transaction fee to create the function account",
+        cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
+      }
+    );
   }
 
   const attestationQueueState = await attestationQueue.loadData();
@@ -268,11 +252,39 @@ interface CostReceipt {
   // COST ESTIMATIONS
   ////////////////////////////////////////////////////////////////
   console.log(`\n### COST`);
-  costReceipts.push({
-    name: "guess",
-    description: "transaction fee to make a guess",
-    cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
-  });
+  costReceipts.push(
+    {
+      name: "guess",
+      description: "transaction fee to make a guess",
+      cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
+    },
+    {
+      name: "FunctionRequest - rent",
+      description: "Rent exemption for the Switchboard FunctionRequestAccount",
+      cost:
+        (await program.provider.connection.getMinimumBalanceForRentExemption(
+          await program.provider.connection
+            .getAccountInfo(switchboardRequest.publicKey)
+            .then((a) => a?.data.length)
+            .catch(
+              () =>
+                switchboardProgram.attestationAccount.functionRequestAccountData
+                  .size + 512
+            )
+        )) / anchor.web3.LAMPORTS_PER_SOL,
+    },
+    {
+      name: "FunctionRequest Escrow - rent",
+      description: "Wrapped SOL token account used to pay for requests",
+      cost:
+        (await program.provider.connection.getMinimumBalanceForRentExemption(
+          await program.provider.connection
+            .getAccountInfo(switchboardRequestEscrowPubkey)
+            .then((a) => a?.data.length)
+            .catch(() => 165 /** Token account bytes */)
+        )) / anchor.web3.LAMPORTS_PER_SOL,
+    }
+  );
   if (!initialUserAccountInfo) {
     costReceipts.push({
       name: "UserState - rent",
@@ -288,34 +300,6 @@ interface CostReceipt {
       `[info] UserState already exists for this user - init_if_needed was not triggered`
     );
   }
-
-  costReceipts.push({
-    name: "FunctionRequest - rent",
-    description: "Rent exemption for the Switchboard FunctionRequestAccount",
-    cost:
-      (await program.provider.connection.getMinimumBalanceForRentExemption(
-        await program.provider.connection
-          .getAccountInfo(switchboardRequest.publicKey)
-          .then((a) => a?.data.length)
-          .catch(
-            () =>
-              switchboardProgram.attestationAccount.functionRequestAccountData
-                .size + 512
-          )
-      )) / anchor.web3.LAMPORTS_PER_SOL,
-  });
-
-  costReceipts.push({
-    name: "FunctionRequest Escrow - rent",
-    description: "Wrapped SOL token account used to pay for requests",
-    cost:
-      (await program.provider.connection.getMinimumBalanceForRentExemption(
-        await program.provider.connection
-          .getAccountInfo(switchboardRequestEscrowPubkey)
-          .then((a) => a?.data.length)
-          .catch(() => 165 /** Token account bytes */)
-      )) / anchor.web3.LAMPORTS_PER_SOL,
-  });
 
   const payerBalanceDelta =
     (startingPayerBalance -

@@ -15,6 +15,9 @@ We'll be working backwards a bit. Switchboard Functions allow you to
 within your function you can make network calls to off-chain resources and
 determine which instruction on your program to respond with.
 
+**NOTE:** Scheduled and periodic calls are also supported but out of scope for
+this example.
+
 In this example when a user makes a guess, we will trigger a Switchboard
 Function with our PROGRAM_ID, MIN_RESULT, MAX_RESULT, and the requesters
 USER_KEY. With this information we can generate randomness within the enclave
@@ -198,3 +201,36 @@ make simple-flip
 # OR
 anchor run simple-flip
 ```
+
+## Switchboard Randomness Callback
+
+The second example
+[programs/switchboard-randomness-callback](./programs/switchboard-randomness-callback/src/lib.rs)
+is a bit more complicated and shows a more efficient approach. In the
+super-simple-randomness program we are creating a new Switchboard
+FunctionRequestAccount each time we call the guess instruction. This means the
+user is paying money for rent exemption on an account they will only use once -
+Switchboard allows the authority of this account to close it but its not a good
+design and requires the user to manually call another transaction to get their
+rent back.
+
+Another pitfall is we never verify the Switchboard FunctionAccount. This account
+tells the off-chain oracles which container to run so a user could provide their
+own function which always settles to their winning result. **You should always
+verify either the Function or FunctionRequest account corresponds to some
+expected pubkey/container.** Remember, validating accounts is the biggest
+responsibility when developing on Solana - make sure you "Anchor" your accounts
+to some expected bounds to prevent a malicous actor from mocking your layout
+with incorrect data and passing it to your program.
+
+So the changes we'll make will include:
+
+- **Add `initialize` ixn**: Add a new instruction to initialize a global program
+  state account for our program and store our function pubkey. When a user makes
+  a request we will verify the request is created for this function each time.
+- **Add `user_init` ixn**: Our user will need to run `user_init` before
+  interacting with our program. This will setup the Switchboard FunctionRequest
+  account with their params. When the user makes a guess we will trigger this
+  account. Now our program is more efficient with managing rent exemption.
+
+**MORE DOCS COMING SOON!**

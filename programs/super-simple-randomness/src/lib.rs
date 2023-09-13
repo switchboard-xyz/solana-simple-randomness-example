@@ -7,7 +7,7 @@
 //                the random result to determine if the user won.
 
 use switchboard_solana::prelude::*;
-declare_id!("8Jryh97AN9Aw9DKyByHjpA2ASp5guMCX1tfWhGg1qQfW");
+declare_id!("Dn1wLPridFoHT4Nn5xinLoh8N2N1YKpMfHpz1gkRTD4w");
 
 pub const PROGRAM_SEED: &[u8] = b"SIMPLE_RANDOMNESS";
 pub const USER_SEED: &[u8] = b"RANDOMNESS_USER";

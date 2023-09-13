@@ -28,6 +28,12 @@ interface UserGuessSettledEvent {
   settledTimestamp: anchor.BN;
 }
 
+interface CostReceipt {
+  name: string;
+  description?: string;
+  cost: number;
+}
+
 const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   ? parseRawMrEnclave(process.env.MR_ENCLAVE)
   : fs.existsSync(path.join(__dirname, "..", "measurement.txt"))
@@ -62,18 +68,23 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
 
   const program: anchor.Program<SuperSimpleRandomness> =
     anchor.workspace.SuperSimpleRandomness;
-  (program as any).provider = provider;
 
   const payer = (provider.wallet as anchor.Wallet).payer;
   console.log(`[env] PAYER: ${payer.publicKey}`);
+
+  const costReceipts: CostReceipt[] = [];
+
+  const startingPayerBalance = await program.provider.connection.getBalance(
+    payer.publicKey
+  );
 
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
 
   // verify House is created and load Switchboard Function
   let switchboardFunction: FunctionAccount;
   let attestationQueue: AttestationQueueAccount;
-  // let attestationQueuePubkey: anchor.web3.PublicKey;
   let isFunctionAuthority: boolean | undefined = undefined;
+  let didCreateFunction = false;
 
   // Attempt to load from env file
   if (process.env.SWITCHBOARD_FUNCTION_PUBKEY) {
@@ -93,9 +104,10 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       // Lets attempt to load the Switchboard Function from our .env file
       let functionState: attestationTypes.FunctionAccountData;
 
-      [switchboardFunction, functionState] = await FunctionAccount.load(
+      // We can decode the AccountInfo to reduce our network calls
+      [switchboardFunction, functionState] = await FunctionAccount.decode(
         switchboardProgram,
-        process.env.SWITCHBOARD_FUNCTION_PUBKEY
+        functionAccountInfo
       );
 
       attestationQueue = new AttestationQueueAccount(
@@ -104,7 +116,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       );
       isFunctionAuthority = functionState.authority.equals(payer.publicKey);
 
-      if (!functionState.mrEnclaves.includes(Array.from(MrEnclave))) {
+      if (!FunctionAccount.hasMrEnclave(functionState.mrEnclaves, MrEnclave)) {
         // Make sure we can add this enclave or else it will fail to verify on-chain
         if (!isFunctionAuthority) {
           throw new Error(
@@ -112,20 +124,20 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
           );
         }
 
-        let existingMeasurements = functionState.mrEnclaves.filter(
-          (arr) => !arr.every((num) => num === 0)
+        const addMrEnclaveTx = await switchboardFunction.tryAddMrEnclave(
+          MrEnclave,
+          { functionState, force: true }
         );
-        if (existingMeasurements.length >= 32) {
-          existingMeasurements = existingMeasurements.slice(
-            existingMeasurements.length - 32 + 1
-          );
-        }
 
-        // add to enclave
-        const fnSetConfigTx = await switchboardFunction.setConfig({
-          mrEnclaves: [...existingMeasurements, Array.from(MrEnclave)],
-        });
-        console.log(`[TX] function_set_config: ${fnSetConfigTx}`);
+        if (addMrEnclaveTx) {
+          console.log(`[TX] function_set_config: ${addMrEnclaveTx}`);
+          costReceipts.push({
+            name: "function_set_config",
+            description:
+              "transaction fee to add the MrEnclave to our function's config",
+            cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
+          });
+        }
       }
     }
   }
@@ -171,6 +183,20 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       }
     );
     console.log(`[TX] function_init: ${functionInitTx}`);
+    didCreateFunction = true;
+    costReceipts.push({
+      name: "FunctionAccount - rent",
+      description: "Rent exemption for the Switchboard FunctionAccount",
+      cost:
+        (await program.provider.connection.getMinimumBalanceForRentExemption(
+          switchboardProgram.attestationAccount.functionAccountData.size
+        )) / anchor.web3.LAMPORTS_PER_SOL,
+    });
+    costReceipts.push({
+      name: "function_init",
+      description: "Transaction fee to create the function account",
+      cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
+    });
 
     console.log(
       `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${functionAccount.publicKey}\n\n`
@@ -226,9 +252,52 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         })
         .signers([switchboardRequestKeypair])
         .rpc()
-        .then((tx) => {
+        .then(async (tx) => {
           console.log(`[TX] guess: ${tx}\n`);
           betTx = tx;
+
+          costReceipts.push({
+            name: "guess",
+            description: "transaction fee to make a guess",
+            cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
+          });
+          costReceipts.push({
+            name: "UserState - rent",
+            description:
+              "Rent exemption for the randomness program's UserState account",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                program.account.userState.size
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          });
+          costReceipts.push({
+            name: "FunctionRequest - rent",
+            description:
+              "Rent exemption for the Switchboard FunctionRequestAccount",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                await program.provider.connection
+                  .getAccountInfo(switchboardRequest.publicKey)
+                  .then((a) => a?.data.length)
+                  .catch(
+                    () =>
+                      switchboardProgram.attestationAccount
+                        .functionRequestAccountData.size + 512
+                  )
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          });
+
+          costReceipts.push({
+            name: "FunctionRequest Escrow - rent",
+            description: "Wrapped SOL token account used to pay for requests",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                await program.provider.connection
+                  .getAccountInfo(switchboardRequestEscrowPubkey)
+                  .then((a) => a?.data.length)
+                  .catch(() => 165 /** Token account bytes */)
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          });
         });
     }),
     "Timed out waiting for 'UserGuessSettled' event"
@@ -259,7 +328,14 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
     console.log(`Sorry, you lost!`);
   }
 
-  // const userState = await program.account.userState.fetch(userPubkey);
+  const attestationQueueState = await attestationQueue.loadData();
+
+  costReceipts.push({
+    name: "Switchboard Fee",
+    description:
+      "Switchboard fee for the request to reward oracles for executing your function request",
+    cost: attestationQueueState.reward / anchor.web3.LAMPORTS_PER_SOL,
+  });
 
   console.log(`\n### METRICS`);
 
@@ -267,12 +343,37 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   console.log(`Settlement Time: ${fullDuration.toFixed(3)} seconds`);
 
   console.log(`\n### COST`);
-  const attestationQueueState = await attestationQueue.loadData();
   const switchboardFunctionCost = attestationQueueState.reward;
+
+  // The Switchboard Request Account contains a Vec<u8> for the params. When initializing this account
+  // we default to storing 512 bytes if not provided. You can decrease this value in
+  // programs/super-simple-randomness/src/lib.rs, as seen belo
+  //  request_init_ctx.invoke(
+  //   ctx.accounts.switchboard.clone(),
+  //   None,
+  //   Some(1000), // slots_until_expiration
+  //   Some(512), <--- here
+  //   Some(request_params.into_bytes()),
+  //   None,
+  //   None,
+  //   )?;
+  const switchboardRequestAccountInfo =
+    await program.provider.connection.getAccountInfo(
+      switchboardRequest.publicKey
+    );
   const switchboardRequestAccountCost =
     await program.provider.connection.getMinimumBalanceForRentExemption(
-      switchboardProgram.attestationAccount.functionRequestAccountData.size
+      switchboardRequestAccountInfo.data.length
     );
+
+  const payerBalanceDelta =
+    (startingPayerBalance -
+      (await program.provider.connection.getBalance(payer.publicKey))) /
+    anchor.web3.LAMPORTS_PER_SOL;
+
+  console.log(
+    `Payer Balance \u0394: ${chalk.red(`- ${payerBalanceDelta}`)} SOL`
+  );
   console.log(
     `Switchboard Fee: ${
       switchboardFunctionCost / anchor.web3.LAMPORTS_PER_SOL
@@ -286,4 +387,19 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   console.log(
     `\t${chalk.blue("NOTE: Request accounts can be closed after use.")}`
   );
+  if (didCreateFunction) {
+    const switchboardFunctionRentExemption =
+      (await program.provider.connection.getMinimumBalanceForRentExemption(
+        switchboardProgram.attestationAccount.functionAccountData.size
+      )) / anchor.web3.LAMPORTS_PER_SOL;
+    console.log(
+      chalk.red(
+        `\n\t${chalk.bold(
+          "NOTE:"
+        )} You created a new Switchboard Function. This will cost you ${switchboardFunctionRentExemption} SOL.`
+      )
+    );
+  }
+
+  console.table(costReceipts);
 })();

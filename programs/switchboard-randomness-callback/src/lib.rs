@@ -75,8 +75,14 @@ pub mod switchboard_randomness_callback {
         request_init_ctx.invoke(
             ctx.accounts.switchboard.clone(),
             &FunctionRequestInitParams {
+                // max_container_params_len - the length of the vec containing the container params
+                // default: 256 bytes
                 max_container_params_len: Some(512),
+                // container_params - the container params
+                // default: empty vec
                 container_params: request_params.into_bytes(),
+                // garbage_collection_slot - the slot when the request can be closed by anyone and is considered dead
+                // default: None, only authority can close the request
                 garbage_collection_slot: None,
             },
         )?;
@@ -118,9 +124,16 @@ pub mod switchboard_randomness_callback {
         };
         request_trigger_ctx.invoke_signed(
             ctx.accounts.switchboard.clone(),
-            None, // bounty - optional fee to reward oracles for priority processing
-            None, // slots_until_expiration - optional max number of slots the request can be processed in
-            None, // valid_after_slot - optional slot the request cannot be processed before
+            // bounty - optional fee to reward oracles for priority processing
+            // default: 0 lamports
+            None,
+            // slots_until_expiration - optional max number of slots the request can be processed in
+            // default: 2250 slots, ~ 15 min at 400 ms/slot
+            // minimum: 150 slots, ~ 1 min at 400 ms/slot
+            None,
+            // valid_after_slot - schedule a request to execute in N slots
+            // default: 0 slots, valid immediately for oracles to process
+            None,
             &[&[
                 USER_SEED,
                 ctx.accounts.authority.key().as_ref(),
@@ -138,7 +151,7 @@ pub mod switchboard_randomness_callback {
     }
 
     pub fn settle(ctx: Context<Settle>, result: u32) -> Result<()> {
-        if result < MIN_RESULT || result > MAX_RESULT {
+        if !(MIN_RESULT..MAX_RESULT).contains(&result) {
             return Err(error!(SimpleRandomnessError::RandomResultOutOfBounds));
         }
 

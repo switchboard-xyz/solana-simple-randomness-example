@@ -94,11 +94,24 @@ pub mod super_simple_randomness {
         };
         request_init_ctx.invoke(
             ctx.accounts.switchboard.clone(),
+            // bounty - optional fee to reward oracles for priority processing
+            // default: 0 lamports
             None,
-            Some(1000),
+            // slots_until_expiration - optional max number of slots the request can be processed in
+            // default: 2250 slots, ~ 15 min at 400 ms/slot
+            // minimum: 150 slots, ~ 1 min at 400 ms/slot
+            None,
+            // max_container_params_len - the length of the vec containing the container params
+            // default: 256 bytes
             Some(512),
+            // container_params - the container params
+            // default: empty vec
             Some(request_params.into_bytes()),
+            // garbage_collection_slot - the slot when the request can be closed by anyone and is considered dead
+            // default: None, only authority can close the request
             None,
+            // valid_after_slot - schedule a request to execute in N slots
+            // default: 0 slots, valid immediately for oracles to process
             None,
         )?;
 

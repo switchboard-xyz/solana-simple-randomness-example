@@ -213,6 +213,8 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
     program.programId
   );
   console.log(`USER: ${userPubkey}`);
+  const initialUserAccountInfo =
+    await program.provider.connection.getAccountInfo(userPubkey);
 
   const switchboardRequestKeypair = anchor.web3.Keypair.generate();
   const switchboardRequestEscrowPubkey = anchor.utils.token.associatedAddress({
@@ -255,49 +257,6 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         .then(async (tx) => {
           console.log(`[TX] guess: ${tx}\n`);
           betTx = tx;
-
-          costReceipts.push({
-            name: "guess",
-            description: "transaction fee to make a guess",
-            cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
-          });
-          costReceipts.push({
-            name: "UserState - rent",
-            description:
-              "Rent exemption for the randomness program's UserState account",
-            cost:
-              (await program.provider.connection.getMinimumBalanceForRentExemption(
-                program.account.userState.size
-              )) / anchor.web3.LAMPORTS_PER_SOL,
-          });
-          costReceipts.push({
-            name: "FunctionRequest - rent",
-            description:
-              "Rent exemption for the Switchboard FunctionRequestAccount",
-            cost:
-              (await program.provider.connection.getMinimumBalanceForRentExemption(
-                await program.provider.connection
-                  .getAccountInfo(switchboardRequest.publicKey)
-                  .then((a) => a?.data.length)
-                  .catch(
-                    () =>
-                      switchboardProgram.attestationAccount
-                        .functionRequestAccountData.size + 512
-                  )
-              )) / anchor.web3.LAMPORTS_PER_SOL,
-          });
-
-          costReceipts.push({
-            name: "FunctionRequest Escrow - rent",
-            description: "Wrapped SOL token account used to pay for requests",
-            cost:
-              (await program.provider.connection.getMinimumBalanceForRentExemption(
-                await program.provider.connection
-                  .getAccountInfo(switchboardRequestEscrowPubkey)
-                  .then((a) => a?.data.length)
-                  .catch(() => 165 /** Token account bytes */)
-              )) / anchor.web3.LAMPORTS_PER_SOL,
-          });
         });
     }),
     "Timed out waiting for 'UserGuessSettled' event"
@@ -342,7 +301,59 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   const fullDuration = (requestSettleTime - requestStartTime) / 1000;
   console.log(`Settlement Time: ${fullDuration.toFixed(3)} seconds`);
 
+  ////////////////////////////////////////////////////////////////
+  // COST ESTIMATIONS
+  ////////////////////////////////////////////////////////////////
   console.log(`\n### COST`);
+  costReceipts.push({
+    name: "guess",
+    description: "transaction fee to make a guess",
+    cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
+  });
+  if (!initialUserAccountInfo) {
+    costReceipts.push({
+      name: "UserState - rent",
+      description:
+        "Rent exemption for the randomness program's UserState account",
+      cost:
+        (await program.provider.connection.getMinimumBalanceForRentExemption(
+          program.account.userState.size
+        )) / anchor.web3.LAMPORTS_PER_SOL,
+    });
+  } else {
+    console.log(
+      `[info] UserState already exists for this user - init_if_needed was not triggered`
+    );
+  }
+
+  costReceipts.push({
+    name: "FunctionRequest - rent",
+    description: "Rent exemption for the Switchboard FunctionRequestAccount",
+    cost:
+      (await program.provider.connection.getMinimumBalanceForRentExemption(
+        await program.provider.connection
+          .getAccountInfo(switchboardRequest.publicKey)
+          .then((a) => a?.data.length)
+          .catch(
+            () =>
+              switchboardProgram.attestationAccount.functionRequestAccountData
+                .size + 512
+          )
+      )) / anchor.web3.LAMPORTS_PER_SOL,
+  });
+
+  costReceipts.push({
+    name: "FunctionRequest Escrow - rent",
+    description: "Wrapped SOL token account used to pay for requests",
+    cost:
+      (await program.provider.connection.getMinimumBalanceForRentExemption(
+        await program.provider.connection
+          .getAccountInfo(switchboardRequestEscrowPubkey)
+          .then((a) => a?.data.length)
+          .catch(() => 165 /** Token account bytes */)
+      )) / anchor.web3.LAMPORTS_PER_SOL,
+  });
+
   const switchboardFunctionCost = attestationQueueState.reward;
 
   // The Switchboard Request Account contains a Vec<u8> for the params. When initializing this account

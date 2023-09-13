@@ -19,6 +19,7 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 import chalk from "chalk";
+import { addMrEnclave, loadSwitchboardFunctionEnv, myMrEnclave } from "./utils";
 dotenv.config();
 
 interface UserGuessSettledEvent {
@@ -34,18 +35,8 @@ interface CostReceipt {
   cost: number;
 }
 
-const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
-  ? parseRawMrEnclave(process.env.MR_ENCLAVE)
-  : fs.existsSync(path.join(__dirname, "..", "measurement.txt"))
-  ? parseRawMrEnclave(
-      fs
-        .readFileSync(path.join(__dirname, "..", "measurement.txt"), "utf-8")
-        .trim()
-    )
-  : undefined;
-
 (async () => {
-  if (!MrEnclave) {
+  if (!myMrEnclave) {
     throw new Error(
       `You need a ./measurement.txt in the project root or define MR_ENCLAVE in your .env file`
     );
@@ -55,6 +46,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       "This script will invoke our Super Simple Randomness program and request a random value between 1 and 10. If SWITCHBOARD_FUNCTION_PUBKEY is not present in your .env file then a new Switchboard Function will be created each time. A Switchboard Request is an instance of a function and allows us to pass custom parameters. In this example we create a new request each time - this is wasteful and requires the user to manually close these after use. See the Switchboard Randomness Callback example program for a more complete implementation where each user has a dedicated request account."
     )}`
   );
+
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(
     process.argv.length > 2
@@ -80,65 +72,36 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
 
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
 
-  // verify House is created and load Switchboard Function
-  let switchboardFunction: FunctionAccount;
-  let attestationQueue: AttestationQueueAccount;
-  let isFunctionAuthority: boolean | undefined = undefined;
-  let didCreateFunction = false;
+  let switchboardFunction: FunctionAccount | undefined = undefined;
+  let functionState: attestationTypes.FunctionAccountData | undefined =
+    undefined;
 
-  // Attempt to load from env file
-  if (process.env.SWITCHBOARD_FUNCTION_PUBKEY) {
-    console.log(
-      `[env] SWITCHBOARD_FUNCTION_PUBKEY: ${process.env.SWITCHBOARD_FUNCTION_PUBKEY}`
+  let attestationQueue: AttestationQueueAccount | undefined = undefined;
+
+  [switchboardFunction, functionState] = await loadSwitchboardFunctionEnv(
+    switchboardProgram
+  );
+
+  // If we loaded our function from .env, try to add the measurement.txt to our function config
+  if (switchboardFunction) {
+    attestationQueue = new AttestationQueueAccount(
+      switchboardProgram,
+      functionState.attestationQueue
     );
-    const functionAccountInfo =
-      await switchboardProgram.provider.connection.getAccountInfo(
-        new anchor.web3.PublicKey(process.env.SWITCHBOARD_FUNCTION_PUBKEY)
-      );
 
-    if (!functionAccountInfo) {
-      console.error(
-        `$SWITCHBOARD_FUNCTION_PUBKEY in your .env file is incorrect, please fix. Creating a new Switchboard Function ...`
-      );
-    } else {
-      // Lets attempt to load the Switchboard Function from our .env file
-      let functionState: attestationTypes.FunctionAccountData;
+    const addEnclaveTxn = await addMrEnclave(
+      switchboardProgram,
+      switchboardFunction,
+      functionState
+    );
 
-      // We can decode the AccountInfo to reduce our network calls
-      [switchboardFunction, functionState] = await FunctionAccount.decode(
-        switchboardProgram,
-        functionAccountInfo
-      );
-
-      attestationQueue = new AttestationQueueAccount(
-        switchboardProgram,
-        functionState.attestationQueue
-      );
-      isFunctionAuthority = functionState.authority.equals(payer.publicKey);
-
-      if (!FunctionAccount.hasMrEnclave(functionState.mrEnclaves, MrEnclave)) {
-        // Make sure we can add this enclave or else it will fail to verify on-chain
-        if (!isFunctionAuthority) {
-          throw new Error(
-            `Function is missing the MrEnclave value ${MrEnclave}. Attempted to add this to the Function config automatically but you are not the function authority (${functionState.authority}). Try creating your own Switchboard Function with '${payer.publicKey}' as the authority, then set SWITCHBOARD_FUNCTION_PUBKEY in your .env file.`
-          );
-        }
-
-        const addMrEnclaveTx = await switchboardFunction.tryAddMrEnclave(
-          MrEnclave,
-          { functionState, force: true }
-        );
-
-        if (addMrEnclaveTx) {
-          console.log(`[TX] function_set_config: ${addMrEnclaveTx}`);
-          costReceipts.push({
-            name: "function_set_config",
-            description:
-              "transaction fee to add the MrEnclave to our function's config",
-            cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
-          });
-        }
-      }
+    if (addEnclaveTxn) {
+      costReceipts.push({
+        name: "function_set_config",
+        description:
+          "transaction fee to add the MrEnclave to our function's config",
+        cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
+      });
     }
   }
 
@@ -165,10 +128,11 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       switchboardProgram,
       attestationQueueAddress
     );
-    await attestationQueue.loadData();
 
     console.log(`Initializing new SwitchboardFunction ...`);
-    const [functionAccount, functionInitTx] = await FunctionAccount.create(
+    let functionInitTx: string;
+
+    [switchboardFunction, functionInitTx] = await FunctionAccount.create(
       switchboardProgram,
       {
         name: "SIMPLE-RANDOMNESS",
@@ -179,11 +143,16 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         version: "latest",
         attestationQueue,
         authority: payer.publicKey,
-        mrEnclave: MrEnclave,
+        mrEnclave: myMrEnclave,
       }
     );
+
+    console.log(
+      `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${switchboardFunction.publicKey}\n\n`
+    );
+
+    // Log the txn signatures and add the cost receipts for easier debugging
     console.log(`[TX] function_init: ${functionInitTx}`);
-    didCreateFunction = true;
     costReceipts.push({
       name: "FunctionAccount - rent",
       description: "Rent exemption for the Switchboard FunctionAccount",
@@ -197,13 +166,9 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       description: "Transaction fee to create the function account",
       cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
     });
-
-    console.log(
-      `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${functionAccount.publicKey}\n\n`
-    );
-
-    switchboardFunction = functionAccount;
   }
+
+  const attestationQueueState = await attestationQueue.loadData();
 
   /////////////////////////////////
   // SUPER SIMPLE RANDOMNESS   ////
@@ -286,8 +251,6 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   } else {
     console.log(`Sorry, you lost!`);
   }
-
-  const attestationQueueState = await attestationQueue.loadData();
 
   costReceipts.push({
     name: "Switchboard Fee",
@@ -398,19 +361,6 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   console.log(
     `\t${chalk.blue("NOTE: Request accounts can be closed after use.")}`
   );
-  if (didCreateFunction) {
-    const switchboardFunctionRentExemption =
-      (await program.provider.connection.getMinimumBalanceForRentExemption(
-        switchboardProgram.attestationAccount.functionAccountData.size
-      )) / anchor.web3.LAMPORTS_PER_SOL;
-    console.log(
-      chalk.red(
-        `\n\t${chalk.bold(
-          "NOTE:"
-        )} You created a new Switchboard Function. This will cost you ${switchboardFunctionRentExemption} SOL.`
-      )
-    );
-  }
 
   console.table(costReceipts);
 })();

@@ -10,6 +10,9 @@
 //                Switchboard Function Request account to trigger the off-chain docker container.
 // - settle:      This ixn will be invoked by the Switchboard oracle off-chain and will provide
 //                the random result to determine if the user won.
+// - close:       This ixn will close the Switchboard Request account for the given user, the requests
+//                escrow account, and the users randomness account. All SOL will be transferred to the
+//                users authority account.
 
 use switchboard_solana::prelude::*;
 
@@ -155,6 +158,35 @@ pub mod switchboard_randomness_callback {
             request_timestamp: user.request_timestamp,
             settled_timestamp: user.settled_timestamp
         });
+
+        Ok(())
+    }
+
+    pub fn close(ctx: Context<Close>) -> Result<()> {
+        let user_bump = ctx.accounts.user.load()?.bump;
+
+        // Close the Switchboard request account and its associated token wallet.
+        let close_ctx = FunctionRequestClose {
+            request: ctx.accounts.switchboard_request.to_account_info(),
+            authority: ctx.accounts.user.to_account_info(),
+            escrow: ctx.accounts.switchboard_request_escrow.to_account_info(),
+            function: ctx.accounts.switchboard_function.to_account_info(),
+            sol_dest: ctx.accounts.authority.to_account_info(),
+            escrow_dest: ctx.accounts.escrow_dest.to_account_info(),
+            state: ctx.accounts.switchboard_state.to_account_info(),
+            token_program: ctx.accounts.token_program.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+        };
+        close_ctx.invoke_signed(
+            ctx.accounts.switchboard.clone(),
+            &[&[
+                USER_SEED,
+                ctx.accounts.authority.key().as_ref(),
+                &[user_bump],
+            ]],
+        )?;
+
+        // Anchor will handle closing our program accounts because we used the 'close' attribute.
 
         Ok(())
     }
@@ -355,6 +387,47 @@ pub struct Settle<'info> {
         )]
     pub switchboard_request: Box<Account<'info, FunctionRequestAccountData>>,
     pub enclave_signer: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct Close<'info> {
+    // RANDOMNESS PROGRAM ACCOUNTS
+    #[account(
+        mut,
+        close = authority,
+        has_one = switchboard_request,
+        has_one = authority,
+    )]
+    pub user: AccountLoader<'info, UserState>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub escrow_dest: Box<Account<'info, TokenAccount>>,
+
+    // SWITCHBOARD ACCOUNTS
+    /// CHECK:
+    #[account(executable, address = SWITCHBOARD_ATTESTATION_PROGRAM_ID)]
+    pub switchboard: AccountInfo<'info>,
+    pub switchboard_state: AccountLoader<'info, AttestationProgramState>,
+    /// CHECK: validated by Switchboard CPI
+    #[account(mut)]
+    pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
+    /// CHECK: validated by Switchboard CPI
+    #[account(mut)]
+    pub switchboard_request: Box<Account<'info, FunctionRequestAccountData>>,
+    /// CHECK: validated by Switchboard CPI
+    #[account(mut)]
+    pub switchboard_request_escrow: Box<Account<'info, TokenAccount>>,
+    #[account(address = anchor_spl::token::spl_token::native_mint::ID)]
+    pub switchboard_mint: Account<'info, Mint>,
+
+    // TOKEN ACCOUNTS
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+
+    // SYSTEM ACCOUNTS
+    pub system_program: Program<'info, System>,
 }
 
 #[error_code]

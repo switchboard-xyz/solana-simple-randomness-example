@@ -22,7 +22,7 @@ async fn main() {
     .unwrap();
 
     // Generate our random result
-    let random_result = generate_randomness(params.min_guess, params.max_guess);
+    let random_result = generate_randomness(params.min_result, params.max_result);
     let mut random_bytes = random_result.to_le_bytes().to_vec();
 
     // IXN DATA:

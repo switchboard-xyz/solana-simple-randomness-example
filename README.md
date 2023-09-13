@@ -13,20 +13,32 @@ bounded by a `MIN_VALUE` and `MAX_VALUE`.
 We'll be working backwards a bit. Switchboard Functions allow you to
 **_"callback"_** into your program with some arbitrary instruction. This means
 within your function you can make network calls to off-chain resources and
-determine which instruction on your program to respond with. In this example
-when a user makes a guess, we will trigger a Switchboard Function with our
-PROGRAM_ID, MIN_GUESS, MAX_GUESS, and the requesters USER_KEY. With this
-information we can generate randomness within the enclave and determine the
-result based on the users guess.
+determine which instruction on your program to respond with.
+
+In this example when a user makes a guess, we will trigger a Switchboard
+Function with our PROGRAM_ID, MIN_RESULT, MAX_RESULT, and the requesters
+USER_KEY. With this information we can generate randomness within the enclave
+and determine the result.
 
 In both examples we will use the same `settle` instruction so we can re-use the
 same function for both contracts (because we pass PROGRAM_ID as a param when we
 create our requests). The code below shows the anchor logic within each program
-for defining the `settle` instruction and the accounts context, along with the
-Switchboard Function logic to generate a u32 result between [MIN_GUESS,
-MAX_GUESS] and call the `settle` function in our program.
+for defining the `settle` instruction, along with the Switchboard Function logic
+to generate a u32 result between [MIN_RESULT, MAX_RESULT] and build a partially
+signed transaction with our settle instruction.
 
-
+Switchboard oracles will read the emitted partially signed transaction, verify
+the code was executed within a Trusted Execution Environment (TEE), and relay
+the transaction on-chain. Switchboard oracles read a generated "quote" from the
+codes runtime when you emit the partially signed transaction from your
+container. This code is unique to the generated executable and relevant OS
+files - any time you change the code or a dependency, your quote will change and
+you will need to update your Switchboard Function config. These quotes are known
+as `MrEnclaves` and represent a fingerprint of the code and the runtime. Within
+your Switchboard Function you define a whitelist of MrEnclaves that are allowed
+to perform some action on your contracts behalf. \*\*!! Make sure you validate
+the Switchboard accounts, as seen below with:\*\*
+`switchboard_request.validate_signer()`
 
 ```rust
 ///////////////////////////
@@ -43,8 +55,11 @@ pub mod switchboard_randomness_callback {
 
 #[derive(Accounts)]
 pub struct Settle<'info> {
-    // PROGRAM ACCOUNTS
-    #[account(mut)]
+    // RANDOMNESS PROGRAM ACCOUNTS
+    #[account(
+        mut,
+        has_one = switchboard_request,
+    )]
     pub user: Account<'info, UserState>,
 
     // SWITCHBOARD ACCOUNTS
@@ -62,6 +77,10 @@ pub struct Settle<'info> {
 //////////////////////////////////////////////////////
 // SWITCHBOARD FUNCTION INSTRUCTION BUILDING LOGIC
 //////////////////////////////////////////////////////
+// Generate our random result
+let random_result: u32 = generate_randomness(params.min_result, params.max_result);
+let mut random_bytes = random_result.to_le_bytes().to_vec();
+
 // IXN DATA:
 // LEN: 12 bytes
 // [0-8]: Anchor Ixn Discriminator
@@ -97,8 +116,85 @@ echo 'DOCKERHUB_IMAGE_NAME=gallynaut/solana-simple-randomness-function' > .env
 
 ## Super Simple Randomness
 
-The first example in
+The first example
 [programs/super-simple-randomness](./programs/super-simple-randomness/src/lib.rs)
-shows a program with two instructions:
+is a program with two instructions:
 
-- **request_randomness**: This function accepts a Switchboard Function
+- **settle**: As mentioned in the
+  [Switchboard Functions](#switchboard-functions) section above, this is the
+  instruction our docker container will build and emit for the Switchboard
+  oracles to verify and relay on-chain. Within this instruction you can perform
+  any custom logic.
+
+- **guess**: We use `init_if_needed` to initialize a UserState to store the
+  guess and eventual result. Then perform a Cross Program Invocation (CPI) into
+  the Switchboard program to create a new request and trigger it. This will
+  instruct the off-chain oracles to run your container and verify it was
+  executed within a trusted enclave.
+
+```rust
+// Trigger the Switchboard request
+// This will instruct the off-chain oracles to execute your docker container and relay
+// the result back to our program via the 'settle' instruction.
+
+let request_params = format!(
+    "PID={},MIN_RESULT={},MAX_RESULT={},USER={}",
+    crate::id(),
+    MIN_RESULT,
+    MAX_RESULT,
+    ctx.accounts.user.key(),
+);
+
+// https://docs.rs/switchboard-solana/latest/switchboard_solana/attestation_program/instructions/request_init_and_trigger/index.html
+let request_init_ctx = FunctionRequestInitAndTrigger {
+    request: ctx.accounts.switchboard_request.clone(),
+    function: ctx.accounts.switchboard_function.to_account_info(),
+    escrow: ctx.accounts.switchboard_request_escrow.clone(),
+    mint: ctx.accounts.switchboard_mint.to_account_info(),
+    state: ctx.accounts.switchboard_state.to_account_info(),
+    attestation_queue: ctx.accounts.switchboard_attestation_queue.to_account_info(),
+    payer: ctx.accounts.payer.to_account_info(),
+    system_program: ctx.accounts.system_program.to_account_info(),
+    token_program: ctx.accounts.token_program.to_account_info(),
+    associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
+};
+request_init_ctx.invoke(
+    ctx.accounts.switchboard.clone(),
+    None,
+    Some(1000),
+    Some(512),
+    Some(request_params.into_bytes()),
+    None,
+    None,
+)?;
+```
+
+**NOTE:** This example uses anchors `init-if-needed` feature to create a new
+account if it doesnt already exist. This feature should be avoided if possible
+and is shown for demo purposes.
+
+### Usage
+
+Set the anchor program IDs to your local keypairs so you can deploy this
+yourself:
+
+```bash
+anchor keys sync
+```
+
+Then deploy the contract with:
+
+```bash
+make simple-flip-deploy
+# OR
+anchor build -p super_simple_randomness
+anchor deploy --provider.cluster devnet -p super_simple_randomness
+```
+
+Then submit a guess and await the result!
+
+```bash
+make simple-flip
+# OR
+anchor run simple-flip
+```

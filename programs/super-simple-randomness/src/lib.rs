@@ -12,11 +12,11 @@ declare_id!("Dn1wLPridFoHT4Nn5xinLoh8N2N1YKpMfHpz1gkRTD4w");
 pub const PROGRAM_SEED: &[u8] = b"SIMPLE_RANDOMNESS";
 pub const USER_SEED: &[u8] = b"RANDOMNESS_USER";
 
-// [MIN_GUESS, MAX_GUESS]
+// [MIN_RESULT, MAX_RESULT]
 /// The minimum guess that can be submitted, inclusive.
-pub const MIN_GUESS: u32 = 1;
+pub const MIN_RESULT: u32 = 1;
 /// The maximum guess that can be submitted, inclusive.
-pub const MAX_GUESS: u32 = 10;
+pub const MAX_RESULT: u32 = 10;
 
 /// The minimum amount of time before a user can re-guess if the previous guess hasnt settled.
 pub const REQUEST_TIMEOUT: i64 = 60;
@@ -60,51 +60,52 @@ pub mod super_simple_randomness {
         }
 
         // Set new guess data
+        ctx.accounts.user.switchboard_request = ctx.accounts.switchboard_request.key();
         ctx.accounts.user.guess = guess;
         ctx.accounts.user.result = 0;
         ctx.accounts.user.request_timestamp = Clock::get()?.unix_timestamp;
         ctx.accounts.user.settled_timestamp = 0;
 
-        // Trigger the Switchboard request
-        // This will instruct the off-chain oracles to execute your docker container and relay
-        // the result back to our program via the 'settle' instruction.
+// Trigger the Switchboard request
+// This will instruct the off-chain oracles to execute your docker container and relay
+// the result back to our program via the 'settle' instruction.
 
-        let request_params = format!(
-            "PID={},MIN_GUESS={},MAX_GUESS={},USER={}",
-            crate::id(),
-            MIN_GUESS,
-            MAX_GUESS,
-            ctx.accounts.user.key(),
-        );
+let request_params = format!(
+    "PID={},MIN_RESULT={},MAX_RESULT={},USER={}",
+    crate::id(),
+    MIN_RESULT,
+    MAX_RESULT,
+    ctx.accounts.user.key(),
+);
 
-        // https://docs.rs/switchboard-solana/latest/switchboard_solana/attestation_program/instructions/request_init_and_trigger/index.html
-        let request_init_ctx = FunctionRequestInitAndTrigger {
-            request: ctx.accounts.switchboard_request.clone(),
-            function: ctx.accounts.switchboard_function.to_account_info(),
-            escrow: ctx.accounts.switchboard_request_escrow.clone(),
-            mint: ctx.accounts.switchboard_mint.to_account_info(),
-            state: ctx.accounts.switchboard_state.to_account_info(),
-            attestation_queue: ctx.accounts.switchboard_attestation_queue.to_account_info(),
-            payer: ctx.accounts.payer.to_account_info(),
-            system_program: ctx.accounts.system_program.to_account_info(),
-            token_program: ctx.accounts.token_program.to_account_info(),
-            associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
-        };
-        request_init_ctx.invoke(
-            ctx.accounts.switchboard.clone(),
-            None,
-            Some(1000),
-            Some(512),
-            Some(request_params.into_bytes()),
-            None,
-            None,
-        )?;
+// https://docs.rs/switchboard-solana/latest/switchboard_solana/attestation_program/instructions/request_init_and_trigger/index.html
+let request_init_ctx = FunctionRequestInitAndTrigger {
+    request: ctx.accounts.switchboard_request.clone(),
+    function: ctx.accounts.switchboard_function.to_account_info(),
+    escrow: ctx.accounts.switchboard_request_escrow.clone(),
+    mint: ctx.accounts.switchboard_mint.to_account_info(),
+    state: ctx.accounts.switchboard_state.to_account_info(),
+    attestation_queue: ctx.accounts.switchboard_attestation_queue.to_account_info(),
+    payer: ctx.accounts.payer.to_account_info(),
+    system_program: ctx.accounts.system_program.to_account_info(),
+    token_program: ctx.accounts.token_program.to_account_info(),
+    associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
+};
+request_init_ctx.invoke(
+    ctx.accounts.switchboard.clone(),
+    None,
+    Some(1000),
+    Some(512),
+    Some(request_params.into_bytes()),
+    None,
+    None,
+)?;
 
         Ok(())
     }
 
     pub fn settle(ctx: Context<Settle>, result: u32) -> Result<()> {
-        if !(MIN_GUESS..MAX_GUESS).contains(&result) {
+        if !(MIN_RESULT..MAX_RESULT).contains(&result) {
             return Err(error!(SimpleRandomnessError::RandomResultOutOfBounds));
         }
 
@@ -141,7 +142,7 @@ pub struct Guess<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    // PROGRAM ACCOUNTS
+    // RANDOMNESS PROGRAM ACCOUNTS
     #[account(
         init_if_needed,
         space = 8 + std::mem::size_of::<UserState>(),
@@ -191,7 +192,7 @@ pub struct Guess<'info> {
 
 #[derive(Accounts)]
 pub struct Settle<'info> {
-    // PROGRAM ACCOUNTS
+    // RANDOMNESS PROGRAM ACCOUNTS
     #[account(
         mut,
         seeds = [USER_SEED, user.authority.as_ref()],

@@ -47,7 +47,7 @@ simple-flip-deploy:
 	anchor build -p super_simple_randomness
 	anchor deploy --provider.cluster devnet -p super_simple_randomness
 
-callback-flip: measurement
+callback-flip:
 	anchor run callback-flip
 callback-flip-deploy:
 	anchor build -p switchboard_randomness_callback

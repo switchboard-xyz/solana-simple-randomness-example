@@ -18,11 +18,11 @@ declare_id!("3bvUdswsFSpoD5kk9jtVakTXg21B9mLFhT1ev9LuqGo3");
 pub const PROGRAM_SEED: &[u8] = b"SIMPLE_RANDOMNESS";
 pub const USER_SEED: &[u8] = b"RANDOMNESS_USER";
 
-// [MIN_GUESS, MAX_GUESS]
+// [MIN_RESULT, MAX_RESULT]
 /// The minimum guess that can be submitted, inclusive.
-pub const MIN_GUESS: u32 = 1;
+pub const MIN_RESULT: u32 = 1;
 /// The maximum guess that can be submitted, inclusive.
-pub const MAX_GUESS: u32 = 10;
+pub const MAX_RESULT: u32 = 10;
 
 /// The minimum amount of time before a user can re-guess if the previous guess hasnt settled.
 pub const REQUEST_TIMEOUT: i64 = 60;
@@ -63,10 +63,10 @@ pub mod switchboard_randomness_callback {
             associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
         };
         let request_params = format!(
-            "PID={},MIN_GUESS={},MAX_GUESS={},USER={}",
+            "PID={},MIN_RESULT={},MAX_RESULT={},USER={}",
             crate::id(),
-            MIN_GUESS,
-            MAX_GUESS,
+            MIN_RESULT,
+            MAX_RESULT,
             user_key,
         );
         request_init_ctx.invoke(
@@ -135,7 +135,7 @@ pub mod switchboard_randomness_callback {
     }
 
     pub fn settle(ctx: Context<Settle>, result: u32) -> Result<()> {
-        if result < MIN_GUESS || result > MAX_GUESS {
+        if result < MIN_RESULT || result > MAX_RESULT {
             return Err(error!(SimpleRandomnessError::RandomResultOutOfBounds));
         }
 
@@ -235,7 +235,7 @@ pub struct CreateUser<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    // PROGRAM ACCOUNTS
+    // RANDOMNESS PROGRAM ACCOUNTS
     #[account(
         seeds = [PROGRAM_SEED],
         bump = program_state.load()?.bump,
@@ -301,7 +301,7 @@ pub struct Guess<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    // PROGRAM ACCOUNTS
+    // RANDOMNESS PROGRAM ACCOUNTS
     #[account(
         seeds = [USER_SEED, authority.key().as_ref()],
         bump = user.load()?.bump,
@@ -338,7 +338,7 @@ pub struct Guess<'info> {
 
 #[derive(Accounts)]
 pub struct Settle<'info> {
-    // PROGRAM ACCOUNTS
+    // RANDOMNESS PROGRAM ACCOUNTS
     #[account(
         mut,
         has_one = switchboard_request,

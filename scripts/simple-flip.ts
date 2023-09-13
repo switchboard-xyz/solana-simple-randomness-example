@@ -5,7 +5,9 @@ import {
   FunctionRequestAccount,
   MAINNET_GENESIS_HASH,
   SwitchboardProgram,
+  attestationTypes,
   loadKeypair,
+  types,
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
 import { SuperSimpleRandomness } from "../target/types/super_simple_randomness";
@@ -17,6 +19,7 @@ import {
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+import chalk from "chalk";
 dotenv.config();
 
 interface UserGuessSettledEvent {
@@ -42,6 +45,11 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       `You need a ./measurement.txt in the project root or define MR_ENCLAVE in your .env file`
     );
   }
+  console.log(
+    `\n${chalk.green(
+      "This script will invoke our Super Simple Randomness program and request a random value between 1 and 10. If SWITCHBOARD_FUNCTION_PUBKEY is not present in your .env file then a new Switchboard Function will be created each time. A Switchboard Request is an instance of a function and allows us to pass custom parameters. In this example we create a new request each time - this is wasteful and requires the user to manually close these after use. See the Switchboard Randomness Callback example program for a more complete implementation where each user has a dedicated request account."
+    )}`
+  );
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(
     process.argv.length > 2
@@ -53,9 +61,8 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       : provider
   );
   const payer = (provider.wallet as anchor.Wallet).payer;
-  console.log(`PAYER: ${payer.publicKey}`);
+  console.log(`[env] PAYER: ${payer.publicKey}`);
 
-  console.log(anchor.workspace);
   const program: anchor.Program<SuperSimpleRandomness> =
     anchor.workspace.SuperSimpleRandomness;
 
@@ -63,47 +70,62 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
 
   // verify House is created and load Switchboard Function
   let switchboardFunction: FunctionAccount;
-  let attestationQueuePubkey: anchor.web3.PublicKey;
+  let attestationQueue: AttestationQueueAccount;
+  // let attestationQueuePubkey: anchor.web3.PublicKey;
   let isFunctionAuthority: boolean | undefined = undefined;
 
   // Attempt to load from env file
   if (process.env.SWITCHBOARD_FUNCTION_PUBKEY) {
-    try {
-      const myFunction = new FunctionAccount(
+    console.log(
+      `[env] SWITCHBOARD_FUNCTION_PUBKEY: ${process.env.SWITCHBOARD_FUNCTION_PUBKEY}`
+    );
+    const functionAccountInfo =
+      await program.provider.connection.getAccountInfo(
+        new anchor.web3.PublicKey(process.env.SWITCHBOARD_FUNCTION_PUBKEY)
+      );
+
+    if (!functionAccountInfo) {
+      console.error(
+        `$SWITCHBOARD_FUNCTION_PUBKEY in your .env file is incorrect, please fix. Creating a new Switchboard Function ...`
+      );
+    } else {
+      // Lets attempt to load the Switchboard Function from our .env file
+      let functionState: attestationTypes.FunctionAccountData;
+
+      [switchboardFunction, functionState] = await FunctionAccount.load(
         switchboardProgram,
         process.env.SWITCHBOARD_FUNCTION_PUBKEY
       );
-      const functionState = await myFunction.loadData();
-      isFunctionAuthority = functionState.authority.equals(payer.publicKey);
 
-      switchboardFunction = myFunction;
-      attestationQueuePubkey = functionState.attestationQueue;
+      attestationQueue = new AttestationQueueAccount(
+        switchboardProgram,
+        functionState.attestationQueue
+      );
+      isFunctionAuthority = functionState.authority.equals(payer.publicKey);
 
       if (!functionState.mrEnclaves.includes(Array.from(MrEnclave))) {
         // Make sure we can add this enclave or else it will fail to verify on-chain
         if (!isFunctionAuthority) {
           throw new Error(
-            `Need to be function authority to add new MrEnclave to function config. Try creating your own Switchboard Function with '${payer.publicKey}' as the authority, then set SWITCHBOARD_FUNCTION_PUBKEY in your .env file.`
+            `Function is missing the MrEnclave value ${MrEnclave}. Attempted to add this to the Function config automatically but you are not the function authority (${functionState.authority}). Try creating your own Switchboard Function with '${payer.publicKey}' as the authority, then set SWITCHBOARD_FUNCTION_PUBKEY in your .env file.`
+          );
+        }
+
+        let existingMeasurements = functionState.mrEnclaves.filter(
+          (arr) => !arr.every((num) => num === 0)
+        );
+        if (existingMeasurements.length >= 32) {
+          existingMeasurements = existingMeasurements.slice(
+            existingMeasurements.length - 32 + 1
           );
         }
 
         // add to enclave
-        let existingMeasurements = functionState.mrEnclaves.filter(
-          (arr) => !arr.every((num) => num === 0)
-        );
-        const fnSetConfigTx = await myFunction.setConfig({
-          mrEnclaves:
-            existingMeasurements.length < 32
-              ? [...existingMeasurements, Array.from(MrEnclave)]
-              : [...existingMeasurements.slice(1), Array.from(MrEnclave)],
+        const fnSetConfigTx = await switchboardFunction.setConfig({
+          mrEnclaves: [...existingMeasurements, Array.from(MrEnclave)],
         });
         console.log(`[TX] function_set_config: ${fnSetConfigTx}`);
       }
-    } catch (error) {
-      console.error(error);
-      console.error(
-        `$SWITCHBOARD_FUNCTION_PUBKEY in your .env file is incorrect, please fix`
-      );
     }
   }
 
@@ -125,12 +147,14 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         `The request script currently only works on mainnet-beta or devnet (if SWITCHBOARD_FUNCTION_PUBKEY is not set in your .env file))`
       );
     }
-    console.log(`Initializing new SwitchboardFunction ...`);
-    const attestationQueue = new AttestationQueueAccount(
+
+    attestationQueue = new AttestationQueueAccount(
       switchboardProgram,
       attestationQueueAddress
     );
     await attestationQueue.loadData();
+
+    console.log(`Initializing new SwitchboardFunction ...`);
     const [functionAccount, functionInitTx] = await FunctionAccount.create(
       switchboardProgram,
       {
@@ -152,7 +176,6 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
     );
 
     switchboardFunction = functionAccount;
-    attestationQueuePubkey = attestationQueue.publicKey;
   }
 
   /////////////////////////////////
@@ -194,7 +217,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
           switchboard: switchboardProgram.attestationProgramId,
           switchboardState:
             switchboardProgram.attestationProgramState.publicKey,
-          switchboardAttestationQueue: attestationQueuePubkey,
+          switchboardAttestationQueue: attestationQueue.publicKey,
           switchboardFunction: switchboardFunction.publicKey,
           switchboardRequest: switchboardRequest.publicKey,
           switchboardRequestEscrow: switchboardRequestEscrowPubkey,
@@ -235,35 +258,31 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
     console.log(`Sorry, you lost!`);
   }
 
-  const userState = await program.account.userState.fetch(userPubkey);
+  // const userState = await program.account.userState.fetch(userPubkey);
 
   console.log(`\n### METRICS`);
 
   const fullDuration = (requestSettleTime - requestStartTime) / 1000;
-  console.log(`Settlement Time: ${fullDuration.toFixed(3)}`);
-  // console.log(
-  //   `Settlement Slots: ${event.slot - userState.currentRound.requestSlot}`
-  // );
+  console.log(`Settlement Time: ${fullDuration.toFixed(3)} seconds`);
 
-  // if (fs.existsSync("metrics.csv")) {
-  //   fs.appendFileSync(
-  //     "metrics.csv",
-  //     `${BNtoDateTimeString(event.timestamp)},${event.roundId},${
-  //       event.userWon
-  //     },${event.result},${userState.currentRound.requestSlot},${event.slot},${
-  //       event.slot - userState.currentRound.requestSlot
-  //     },${fullDuration.toFixed(3)},${betTx}\n`
-  //   );
-  // } else {
-  //   fs.writeFileSync(
-  //     "metrics.csv",
-  //     `timestamp,roundId,userWon,result,requestSlot,settledSlot,slotDifference,settlementTime,tx\n${BNtoDateTimeString(
-  //       event.timestamp
-  //     )},${event.roundId},${event.userWon},${event.result},${
-  //       userState.currentRound.requestSlot
-  //     },${event.slot},${
-  //       event.slot - userState.currentRound.requestSlot
-  //     },${fullDuration.toFixed(3)},${betTx}\n`
-  //   );
-  // }
+  console.log(`\n### COST`);
+  const attestationQueueState = await attestationQueue.loadData();
+  const switchboardFunctionCost = attestationQueueState.reward;
+  const switchboardRequestAccountCost =
+    await program.provider.connection.getMinimumBalanceForRentExemption(
+      switchboardProgram.attestationAccount.functionRequestAccountData.size
+    );
+  console.log(
+    `Switchboard Fee: ${
+      switchboardFunctionCost / anchor.web3.LAMPORTS_PER_SOL
+    } SOL (per request)`
+  );
+  console.log(
+    `Request Account Rent: ${
+      switchboardRequestAccountCost / anchor.web3.LAMPORTS_PER_SOL
+    } SOL (per account)`
+  );
+  console.log(
+    `\t${chalk.blue("NOTE: Request accounts can be closed after use.")}`
+  );
 })();

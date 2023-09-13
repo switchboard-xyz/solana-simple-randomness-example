@@ -5,9 +5,7 @@ WORKDIR /home/root/switchboard-function
 COPY ./switchboard-function/Cargo.toml ./
 COPY ./switchboard-function/src ./src/
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} \
-    --mount=type=cache,target=./switchboard-function/target,id=${TARGETPLATFORM} \
-    cargo build --release && \
+RUN cargo build --release && \
     cargo strip && \
     mv target/release/simple-randomness-function /sgx/app
 

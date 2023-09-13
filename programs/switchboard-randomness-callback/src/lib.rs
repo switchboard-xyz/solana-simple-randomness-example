@@ -43,7 +43,7 @@ pub mod switchboard_randomness_callback {
 
     pub fn create_user(ctx: Context<CreateUser>) -> Result<()> {
         // Verify this exists
-        let program_state = ctx.accounts.program_state.load()?;
+        let _program_state = ctx.accounts.program_state.load()?;
 
         let user_key = ctx.accounts.user.key();
 

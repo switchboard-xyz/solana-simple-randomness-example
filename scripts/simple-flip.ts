@@ -88,15 +88,19 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         }
 
         // add to enclave
+        let existingMeasurements = functionState.mrEnclaves.filter(
+          (arr) => !arr.every((num) => num === 0)
+        );
         const fnSetConfigTx = await myFunction.setConfig({
           mrEnclaves:
-            functionState.mrEnclaves.length < 32
-              ? [...functionState.mrEnclaves, Array.from(MrEnclave)]
-              : [...functionState.mrEnclaves.slice(1), Array.from(MrEnclave)],
+            existingMeasurements.length < 32
+              ? [...existingMeasurements, Array.from(MrEnclave)]
+              : [...existingMeasurements.slice(1), Array.from(MrEnclave)],
         });
         console.log(`[TX] function_set_config: ${fnSetConfigTx}`);
       }
     } catch (error) {
+      console.error(error);
       console.error(
         `$SWITCHBOARD_FUNCTION_PUBKEY in your .env file is incorrect, please fix`
       );

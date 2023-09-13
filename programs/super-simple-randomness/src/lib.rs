@@ -7,7 +7,7 @@
 //                the random result to determine if the user won.
 
 use switchboard_solana::prelude::*;
-declare_id!("Dn1wLPridFoHT4Nn5xinLoh8N2N1YKpMfHpz1gkRTD4w");
+declare_id!("8Jryh97AN9Aw9DKyByHjpA2ASp5guMCX1tfWhGg1qQfW");
 
 pub const PROGRAM_SEED: &[u8] = b"SIMPLE_RANDOMNESS";
 pub const USER_SEED: &[u8] = b"RANDOMNESS_USER";
@@ -66,40 +66,40 @@ pub mod super_simple_randomness {
         ctx.accounts.user.request_timestamp = Clock::get()?.unix_timestamp;
         ctx.accounts.user.settled_timestamp = 0;
 
-// Trigger the Switchboard request
-// This will instruct the off-chain oracles to execute your docker container and relay
-// the result back to our program via the 'settle' instruction.
+        // Trigger the Switchboard request
+        // This will instruct the off-chain oracles to execute your docker container and relay
+        // the result back to our program via the 'settle' instruction.
 
-let request_params = format!(
-    "PID={},MIN_RESULT={},MAX_RESULT={},USER={}",
-    crate::id(),
-    MIN_RESULT,
-    MAX_RESULT,
-    ctx.accounts.user.key(),
-);
+        let request_params = format!(
+            "PID={},MIN_RESULT={},MAX_RESULT={},USER={}",
+            crate::id(),
+            MIN_RESULT,
+            MAX_RESULT,
+            ctx.accounts.user.key(),
+        );
 
-// https://docs.rs/switchboard-solana/latest/switchboard_solana/attestation_program/instructions/request_init_and_trigger/index.html
-let request_init_ctx = FunctionRequestInitAndTrigger {
-    request: ctx.accounts.switchboard_request.clone(),
-    function: ctx.accounts.switchboard_function.to_account_info(),
-    escrow: ctx.accounts.switchboard_request_escrow.clone(),
-    mint: ctx.accounts.switchboard_mint.to_account_info(),
-    state: ctx.accounts.switchboard_state.to_account_info(),
-    attestation_queue: ctx.accounts.switchboard_attestation_queue.to_account_info(),
-    payer: ctx.accounts.payer.to_account_info(),
-    system_program: ctx.accounts.system_program.to_account_info(),
-    token_program: ctx.accounts.token_program.to_account_info(),
-    associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
-};
-request_init_ctx.invoke(
-    ctx.accounts.switchboard.clone(),
-    None,
-    Some(1000),
-    Some(512),
-    Some(request_params.into_bytes()),
-    None,
-    None,
-)?;
+        // https://docs.rs/switchboard-solana/latest/switchboard_solana/attestation_program/instructions/request_init_and_trigger/index.html
+        let request_init_ctx = FunctionRequestInitAndTrigger {
+            request: ctx.accounts.switchboard_request.clone(),
+            function: ctx.accounts.switchboard_function.to_account_info(),
+            escrow: ctx.accounts.switchboard_request_escrow.clone(),
+            mint: ctx.accounts.switchboard_mint.to_account_info(),
+            state: ctx.accounts.switchboard_state.to_account_info(),
+            attestation_queue: ctx.accounts.switchboard_attestation_queue.to_account_info(),
+            payer: ctx.accounts.payer.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+            token_program: ctx.accounts.token_program.to_account_info(),
+            associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
+        };
+        request_init_ctx.invoke(
+            ctx.accounts.switchboard.clone(),
+            None,
+            Some(1000),
+            Some(512),
+            Some(request_params.into_bytes()),
+            None,
+            None,
+        )?;
 
         Ok(())
     }

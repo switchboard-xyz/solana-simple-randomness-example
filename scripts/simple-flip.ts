@@ -7,7 +7,6 @@ import {
   SwitchboardProgram,
   attestationTypes,
   loadKeypair,
-  types,
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
 import { SuperSimpleRandomness } from "../target/types/super_simple_randomness";
@@ -60,11 +59,13 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         )
       : provider
   );
-  const payer = (provider.wallet as anchor.Wallet).payer;
-  console.log(`[env] PAYER: ${payer.publicKey}`);
 
   const program: anchor.Program<SuperSimpleRandomness> =
     anchor.workspace.SuperSimpleRandomness;
+  (program as any).provider = provider;
+
+  const payer = (provider.wallet as anchor.Wallet).payer;
+  console.log(`[env] PAYER: ${payer.publicKey}`);
 
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
 
@@ -80,7 +81,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       `[env] SWITCHBOARD_FUNCTION_PUBKEY: ${process.env.SWITCHBOARD_FUNCTION_PUBKEY}`
     );
     const functionAccountInfo =
-      await program.provider.connection.getAccountInfo(
+      await switchboardProgram.provider.connection.getAccountInfo(
         new anchor.web3.PublicKey(process.env.SWITCHBOARD_FUNCTION_PUBKEY)
       );
 

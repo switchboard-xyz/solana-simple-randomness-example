@@ -15,15 +15,16 @@ else
 endif
 
 # Default make task
-all: build
+all: anchor_sync build
 
+anchor_sync :; anchor keys sync
 anchor_build :; anchor build
-anchor_publish:; anchor deploy --provider.cluster devnet
+anchor_publish:; make -j 2 simple-flip-deploy callback-flip-deploy
 
 docker_build: 
-	DOCKER_BUILDKIT=1 docker buildx build --platform linux/amd64 --pull -f Dockerfile -t ${DOCKER_IMAGE_NAME}:dev --load ./
+	DOCKER_BUILDKIT=1 docker buildx build --platform linux/amd64 --pull -f Dockerfile -t ${DOCKER_IMAGE_NAME} --load ./
 docker_publish: 
-	DOCKER_BUILDKIT=1 docker buildx build --no-cache --platform linux/amd64 --pull -f Dockerfile -t ${DOCKER_IMAGE_NAME} --push ./
+	DOCKER_BUILDKIT=1 docker buildx build --platform linux/amd64 --pull -f Dockerfile -t ${DOCKER_IMAGE_NAME} --push ./
 
 build: anchor_build docker_build measurement
 
@@ -31,7 +32,7 @@ dev: dev_docker_build measurement
 
 publish: anchor_publish docker_publish measurement
 
-measurement-rust-function: check_docker_env
+measurement: check_docker_env
 	docker pull --platform=linux/amd64 -q ${DOCKERHUB_IMAGE_NAME}:latest
 	@docker run -d --platform=linux/amd64 -q --name=my-switchboard-function ${DOCKERHUB_IMAGE_NAME}:latest
 	@docker cp my-switchboard-function:/measurement.txt ./measurement.txt
@@ -40,6 +41,20 @@ measurement-rust-function: check_docker_env
 	@docker stop my-switchboard-function > /dev/null
 	@docker rm my-switchboard-function > /dev/null
 
+simple-flip:
+	anchor run simple-flip
+simple-flip-deploy:
+	anchor build -p super_simple_randomness
+	anchor deploy --provider.cluster devnet -p super_simple_randomness
+
+callback-flip: measurement
+	anchor run callback-flip
+callback-flip-deploy:
+	anchor build -p switchboard_randomness_callback
+	anchor deploy --provider.cluster devnet -p switchboard_randomness_callback
+
 # Task to clean up the compiled rust application
 clean:
 	cargo clean
+
+	

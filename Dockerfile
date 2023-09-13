@@ -2,7 +2,7 @@
 FROM switchboardlabs/sgx-function AS builder
 
 WORKDIR /home/root/switchboard-function
-COPY ./switchboard-function/Cargo.toml ./switchboard-function/Cargo.lock  ./
+COPY ./switchboard-function/Cargo.toml ./
 COPY ./switchboard-function/src ./src/
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} \

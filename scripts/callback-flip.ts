@@ -8,7 +8,7 @@ import {
   loadKeypair,
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
-import { SolanaSimpleRandomness } from "../target/types/solana_simple_randomness";
+import { SwitchboardRandomnessCallback } from "../target/types/switchboard_randomness_callback";
 import { parseRawMrEnclave, promiseWithTimeout } from "@switchboard-xyz/common";
 import fs from "fs";
 import dotenv from "dotenv";
@@ -20,9 +20,6 @@ interface UserGuessSettledEvent {
   requestTimestamp: anchor.BN;
   settledTimestamp: anchor.BN;
 }
-
-// const DOCKER_IMAGE_NAME =
-//   process.env.DOCKER_IMAGE_NAME ?? "gallynaut/solana-vrf-flip";
 
 const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   ? parseRawMrEnclave(process.env.MR_ENCLAVE)
@@ -44,8 +41,8 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   const payer = (provider.wallet as anchor.Wallet).payer;
   console.log(`PAYER: ${payer.publicKey}`);
 
-  const program: anchor.Program<SolanaSimpleRandomness> =
-    anchor.workspace.SolanaSimpleRandomness;
+  const program: anchor.Program<SwitchboardRandomnessCallback> =
+    anchor.workspace.SwitchboardRandomnessCallback;
 
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
 
@@ -57,8 +54,6 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
 
   // verify House is created and load Switchboard Function
   let switchboardFunction: FunctionAccount;
-  let flipMintPubkey: anchor.web3.PublicKey;
-  let houseVaultPubkey: anchor.web3.PublicKey;
   let attestationQueuePubkey: anchor.web3.PublicKey;
 
   try {
@@ -127,9 +122,9 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
     }
 
     if (!switchboardFunction || !attestationQueuePubkey) {
-      if (!process.env.DOCKER_IMAGE_NAME) {
+      if (!process.env.DOCKERHUB_IMAGE_NAME) {
         throw new Error(
-          `You need to set DOCKER_IMAGE_NAME in your .env file to create a new Switchboard Function. Example:\n\tDOCKER_IMAGE_NAME=gallynaut/solana-simple-randomness-function`
+          `You need to set DOCKERHUB_IMAGE_NAME in your .env file to create a new Switchboard Function. Example:\n\tDOCKERHUB_IMAGE_NAME=gallynaut/solana-simple-randomness-function`
         );
       }
       const genesisHash = await provider.connection.getGenesisHash();
@@ -156,7 +151,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
           name: "SIMPLE-RANDOMNESS",
           metadata:
             "https://github.com/switchboard-xyz/solana-simple-randomness-example/tree/main/switchboard-function",
-          container: process.env.DOCKER_IMAGE_NAME,
+          container: process.env.DOCKERHUB_IMAGE_NAME,
           containerRegistry: "dockerhub",
           version: "latest",
           attestationQueue,

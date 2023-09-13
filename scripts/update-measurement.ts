@@ -4,7 +4,7 @@ import {
   loadKeypair,
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
-import { SolanaSimpleRandomness } from "../target/types/solana_simple_randomness";
+import { SwitchboardRandomnessCallback } from "../target/types/switchboard_randomness_callback";
 import { parseRawMrEnclave } from "@switchboard-xyz/common";
 import fs from "fs";
 import dotenv from "dotenv";
@@ -39,8 +39,8 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   );
   const payer = (provider.wallet as anchor.Wallet).payer;
 
-  const program: anchor.Program<SolanaSimpleRandomness> =
-    anchor.workspace.SolanaSimpleRandomness;
+  const program: anchor.Program<SwitchboardRandomnessCallback> =
+    anchor.workspace.SwitchboardRandomnessCallback;
 
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
 

@@ -12,7 +12,8 @@
 //                the random result to determine if the user won.
 
 use switchboard_solana::prelude::*;
-declare_id!("J3F5PADJvSKsfEXs3MJ9FGdM4gPS6cwzE2K1pDDWr1ih");
+
+declare_id!("3bvUdswsFSpoD5kk9jtVakTXg21B9mLFhT1ev9LuqGo3");
 
 pub const PROGRAM_SEED: &[u8] = b"SIMPLE_RANDOMNESS";
 pub const USER_SEED: &[u8] = b"RANDOMNESS_USER";
@@ -27,7 +28,7 @@ pub const MAX_GUESS: u32 = 10;
 pub const REQUEST_TIMEOUT: i64 = 60;
 
 #[program]
-pub mod solana_simple_randomness {
+pub mod switchboard_randomness_callback {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {

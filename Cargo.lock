@@ -605,9 +605,9 @@ checksum = "9ba43ea6f343b788c8764558649e08df62f86c6ef251fdaeb1ffd010a9ae50a2"
 
 [[package]]
 name = "base64ct"
-version = "1.1.1"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6b4d9b1225d28d360ec6a231d65af1fd99a2a095154c8040689617290569c5c"
+checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
 name = "bincode"
@@ -3946,13 +3946,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "solana-simple-randomness"
-version = "0.1.0"
-dependencies = [
- "switchboard-solana",
-]
-
-[[package]]
 name = "solana-streamer"
 version = "1.16.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4251,6 +4244,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
+name = "super-simple-randomness"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "switchboard-solana",
+]
+
+[[package]]
 name = "superslice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4258,22 +4259,27 @@ checksum = "ab16ced94dbd8a46c82fd81e3ed9a8727dac2977ea869d217bcc4ea1f122e81f"
 
 [[package]]
 name = "switchboard-common"
-version = "0.8.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "723a9a346c6d6eb3374ebe8ea3848e61d40d1f9f46635604137e19a1a4262c52"
+version = "0.8.18"
 dependencies = [
  "envy",
+ "getrandom 0.2.10",
  "hex",
  "serde",
  "serde_json",
+ "sgx-quote",
  "sha2 0.10.7",
 ]
 
 [[package]]
+name = "switchboard-randomness-callback"
+version = "0.1.0"
+dependencies = [
+ "switchboard-solana",
+]
+
+[[package]]
 name = "switchboard-solana"
-version = "0.28.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c34dfd77793203f9eca7ccf6db4ae6a6cd6a1d54ed3d1cebce0ced3b2487647"
+version = "0.28.18"
 dependencies = [
  "anchor-client",
  "anchor-lang",

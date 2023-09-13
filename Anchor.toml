@@ -1,15 +1,14 @@
-[workspace]
-members = ["."]
-
 [features]
 seeds = false
 skip-lint = false
 
 [programs.localnet]
-solana_simple_randomness = "J3F5PADJvSKsfEXs3MJ9FGdM4gPS6cwzE2K1pDDWr1ih"
+super_simple_randomness = "Dn1wLPridFoHT4Nn5xinLoh8N2N1YKpMfHpz1gkRTD4w"
+switchboard_randomness_callback = "3bvUdswsFSpoD5kk9jtVakTXg21B9mLFhT1ev9LuqGo3"
 
 [programs.devnet]
-solana_simple_randomness = "J3F5PADJvSKsfEXs3MJ9FGdM4gPS6cwzE2K1pDDWr1ih"
+super_simple_randomness = "Dn1wLPridFoHT4Nn5xinLoh8N2N1YKpMfHpz1gkRTD4w"
+switchboard_randomness_callback = "3bvUdswsFSpoD5kk9jtVakTXg21B9mLFhT1ev9LuqGo3"
 
 [provider]
 cluster = "Devnet"
@@ -17,7 +16,8 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
-request = "tsx ./scripts/request.ts"
+callback-flip = "tsx ./scripts/request.ts"
+simple-flip = "tsx ./scripts/simple-flip.ts"
 update-measurement = "tsx ./scripts/update-measurement.ts"
 
 [test.validator]

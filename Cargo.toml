@@ -1,5 +1,5 @@
 [workspace]
-members = ["."]
+members = ["programs/*"]
 
 [profile.release]
 overflow-checks = true
@@ -9,24 +9,3 @@ codegen-units = 1
 opt-level = 3
 incremental = false
 codegen-units = 1
-
-[package]
-name = "solana-simple-randomness"
-version = "0.1.0"
-description = "Created with Anchor"
-edition = "2021"
-
-[lib]
-crate-type = ["cdylib", "lib"]
-name = "solana_simple_randomness"
-
-[features]
-no-entrypoint = []
-no-idl = []
-no-log-ix-name = []
-cpi = ["no-entrypoint"]
-default = []
-
-[dependencies]
-# switchboard-solana = { version = "0.28", path = "../sbv3/rust/switchboard-solana" }
-switchboard-solana = "0.28"

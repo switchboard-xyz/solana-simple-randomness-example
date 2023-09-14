@@ -137,10 +137,35 @@ interface CostReceipt {
           rent: [
             {
               account: "FunctionAccount",
-              description: "Rent exemption for the Switchboard FunctionAccount",
+              description: "SwitchboardFunction account",
               cost:
                 (await program.provider.connection.getMinimumBalanceForRentExemption(
                   switchboardProgram.attestationAccount.functionAccountData.size
+                )) / anchor.web3.LAMPORTS_PER_SOL,
+            },
+            {
+              account: "SwitchboardWallet",
+              description: "Re-useable wallet for Switchboard functions",
+              cost:
+                (await program.provider.connection.getMinimumBalanceForRentExemption(
+                  switchboardProgram.attestationAccount.switchboardWallet.size
+                )) / anchor.web3.LAMPORTS_PER_SOL,
+            },
+            {
+              account: "SwitchboardWallet Escrow",
+              description: "Wrapped SOL token account used to pay for requests",
+              cost:
+                (await program.provider.connection.getMinimumBalanceForRentExemption(
+                  165 /** TokenAccount bytes */
+                )) / anchor.web3.LAMPORTS_PER_SOL,
+            },
+            {
+              account: "AddressLookupTable",
+              description:
+                "Solana Address Lookup table to support versioned transactions in the future",
+              cost:
+                (await program.provider.connection.getMinimumBalanceForRentExemption(
+                  568 /** Address Lookup Account bytes */
                 )) / anchor.web3.LAMPORTS_PER_SOL,
             },
           ],
@@ -228,10 +253,7 @@ interface CostReceipt {
             description: "Wrapped SOL token account used to pay for requests",
             cost:
               (await program.provider.connection.getMinimumBalanceForRentExemption(
-                await program.provider.connection
-                  .getAccountInfo(switchboardRequestEscrowPubkey)
-                  .then((a) => a?.data.length)
-                  .catch(() => 165 /** Token account bytes */)
+                165 /** TokenAccount bytes */
               )) / anchor.web3.LAMPORTS_PER_SOL,
           },
           ...(initialUserAccountInfo

@@ -3,12 +3,12 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-super_simple_randomness = "Dn1wLPridFoHT4Nn5xinLoh8N2N1YKpMfHpz1gkRTD4w"
-switchboard_randomness_callback = "3bvUdswsFSpoD5kk9jtVakTXg21B9mLFhT1ev9LuqGo3"
+super_simple_randomness = "E5MAszjz8qZZDHKqQ21g5wYuhMTjMbk1L4L4jBFXMgqG"
+switchboard_randomness_callback = "5bKuRru1qgEeQUXSAJvsXc8hZEGpCucEaaDQkmyd8j6v"
 
 [programs.devnet]
-super_simple_randomness = "Dn1wLPridFoHT4Nn5xinLoh8N2N1YKpMfHpz1gkRTD4w"
-switchboard_randomness_callback = "3bvUdswsFSpoD5kk9jtVakTXg21B9mLFhT1ev9LuqGo3"
+super_simple_randomness = "E5MAszjz8qZZDHKqQ21g5wYuhMTjMbk1L4L4jBFXMgqG"
+switchboard_randomness_callback = "5bKuRru1qgEeQUXSAJvsXc8hZEGpCucEaaDQkmyd8j6v"
 
 [provider]
 cluster = "Devnet"

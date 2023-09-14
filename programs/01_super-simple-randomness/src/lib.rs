@@ -8,7 +8,7 @@
 
 use switchboard_solana::prelude::*;
 
-declare_id!("Dn1wLPridFoHT4Nn5xinLoh8N2N1YKpMfHpz1gkRTD4w");
+declare_id!("E5MAszjz8qZZDHKqQ21g5wYuhMTjMbk1L4L4jBFXMgqG");
 
 pub const PROGRAM_SEED: &[u8] = b"SIMPLE_RANDOMNESS";
 pub const USER_SEED: &[u8] = b"RANDOMNESS_USER";

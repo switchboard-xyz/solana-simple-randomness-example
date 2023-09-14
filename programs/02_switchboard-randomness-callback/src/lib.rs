@@ -16,7 +16,7 @@
 
 use switchboard_solana::prelude::*;
 
-declare_id!("3bvUdswsFSpoD5kk9jtVakTXg21B9mLFhT1ev9LuqGo3");
+declare_id!("5bKuRru1qgEeQUXSAJvsXc8hZEGpCucEaaDQkmyd8j6v");
 
 pub const PROGRAM_SEED: &[u8] = b"SIMPLE_RANDOMNESS";
 pub const USER_SEED: &[u8] = b"RANDOMNESS_USER";

@@ -87,44 +87,90 @@ interface UserGuessSettledEvent {
       throw error;
     }
 
+    console.log(`Program state not found, initializing ...`);
+
     if (!switchboardFunction) {
       // First try to load from our .env file
       [switchboardFunction, functionState] = await loadSwitchboardFunctionEnv(
         switchboardProgram
       );
 
-      // Load the default attestation queue by devnet or mainnet genesis hash
-      attestationQueue = new AttestationQueueAccount(
-        switchboardProgram,
-        functionState.attestationQueue
-      );
+      if (functionState) {
+        // Load the default attestation queue by devnet or mainnet genesis hash
+        attestationQueue = new AttestationQueueAccount(
+          switchboardProgram,
+          functionState.attestationQueue
+        );
+      }
     }
 
     if (!switchboardFunction) {
       // Get the Attestation queue address from the clusters genesis hash
       attestationQueue = await loadDefaultQueue(switchboardProgram);
 
-      console.log(`Initializing new SwitchboardFunction ...`);
-      let functionInitTx: string;
+      await testMeter.run("function_init", async (meter) => {
+        let tx: string;
+        [switchboardFunction, tx] = await FunctionAccount.create(
+          switchboardProgram,
+          {
+            name: "SIMPLE-RANDOMNESS",
+            metadata:
+              "https://github.com/switchboard-xyz/solana-simple-randomness-example/tree/main/switchboard-function",
+            container: process.env.DOCKERHUB_IMAGE_NAME,
+            containerRegistry: "dockerhub",
+            version: "latest",
+            attestationQueue,
+            authority: payer.publicKey,
+            mrEnclave: myMrEnclave,
+          }
+        );
 
-      [switchboardFunction, functionInitTx] = await FunctionAccount.create(
-        switchboardProgram,
-        {
-          name: "SIMPLE-RANDOMNESS",
-          metadata:
-            "https://github.com/switchboard-xyz/solana-simple-randomness-example/tree/main/switchboard-function",
-          container: process.env.DOCKERHUB_IMAGE_NAME,
-          containerRegistry: "dockerhub",
-          version: "latest",
-          attestationQueue,
-          authority: payer.publicKey,
-          mrEnclave: myMrEnclave,
-        }
-      );
+        console.log(
+          `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${switchboardFunction.publicKey}\n\n`
+        );
 
-      console.log(
-        `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${switchboardFunction.publicKey}\n\n`
-      );
+        meter.addReceipt({
+          name: "function_init",
+          tx: tx,
+          rent: [
+            {
+              account: "FunctionAccount",
+              description: "SwitchboardFunction account",
+              cost:
+                (await program.provider.connection.getMinimumBalanceForRentExemption(
+                  switchboardProgram.attestationAccount.functionAccountData.size
+                )) / anchor.web3.LAMPORTS_PER_SOL,
+            },
+            {
+              account: "SwitchboardWallet",
+              description: "Re-useable wallet for Switchboard functions",
+              cost:
+                (await program.provider.connection.getMinimumBalanceForRentExemption(
+                  switchboardProgram.attestationAccount.switchboardWallet.size
+                )) / anchor.web3.LAMPORTS_PER_SOL,
+            },
+            {
+              account: "SwitchboardWallet Escrow",
+              description: "Wrapped SOL token account used to pay for requests",
+              cost:
+                (await program.provider.connection.getMinimumBalanceForRentExemption(
+                  165 /** TokenAccount bytes */
+                )) / anchor.web3.LAMPORTS_PER_SOL,
+            },
+            {
+              account: "AddressLookupTable",
+              description:
+                "Solana Address Lookup table to support versioned transactions in the future",
+              cost:
+                (await program.provider.connection.getMinimumBalanceForRentExemption(
+                  568 /** Address Lookup Account bytes */
+                )) / anchor.web3.LAMPORTS_PER_SOL,
+            },
+          ],
+        });
+
+        return tx;
+      });
     }
 
     if (!switchboardFunction) {
@@ -148,25 +194,43 @@ interface UserGuessSettledEvent {
       }
     } catch {}
 
-    const tx = await program.methods
-      .initialize()
-      .accounts({
-        payer: payer.publicKey,
-        programState: programStatePubkey,
-        authority: payer.publicKey,
-        switchboardFunction: switchboardFunction.publicKey,
-      })
-      .rpc();
-    console.log(`[TX] initialize: ${tx}`);
+    await testMeter.run("initialize", async (meter) => {
+      const tx = await program.methods
+        .initialize()
+        .accounts({
+          payer: payer.publicKey,
+          programState: programStatePubkey,
+          authority: payer.publicKey,
+          switchboardFunction: switchboardFunction.publicKey,
+        })
+        .rpc();
+      console.log(`[TX] initialize: ${tx}`);
+
+      meter.addReceipt({
+        name: "initialize",
+        tx: tx,
+        rent: [
+          {
+            account: "ProgramState",
+            description:
+              "Global account to hold our Switchboard Function pubkey to validate user requests",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                program.account.programState.size
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          },
+        ],
+      });
+
+      return tx;
+    });
   }
 
   const [userPubkey] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("RANDOMNESS_USER"), payer.publicKey.toBytes()],
     program.programId
   );
-  console.log(`USER: ${userPubkey}`);
 
-  // check if user exists and get the request
   let switchboardRequest: FunctionRequestAccount;
   let switchboardRequestEscrowPubkey: anchor.web3.PublicKey;
 
@@ -185,37 +249,81 @@ interface UserGuessSettledEvent {
       throw error;
     }
 
-    // Create a new user account
-    const switchboardRequestKeypair = anchor.web3.Keypair.generate();
-    const switchboardRequestEscrow = anchor.utils.token.associatedAddress({
-      mint: switchboardProgram.mint.address,
-      owner: switchboardRequestKeypair.publicKey,
+    await testMeter.run("create_user", async (meter) => {
+      // Create a new user account
+
+      // Create a new request account with a fresh keypair
+      const switchboardRequestKeypair = anchor.web3.Keypair.generate();
+      switchboardRequest = new FunctionRequestAccount(
+        switchboardProgram,
+        switchboardRequestKeypair.publicKey
+      );
+
+      switchboardRequestEscrowPubkey = anchor.utils.token.associatedAddress({
+        mint: switchboardProgram.mint.address,
+        owner: switchboardRequestKeypair.publicKey,
+      });
+
+      const tx = await program.methods
+        .createUser()
+        .accounts({
+          payer: payer.publicKey,
+          programState: programStatePubkey,
+          user: userPubkey,
+          authority: payer.publicKey,
+          switchboard: switchboardProgram.attestationProgramId,
+          switchboardState:
+            switchboardProgram.attestationProgramState.publicKey,
+          switchboardAttestationQueue: attestationQueue.publicKey,
+          switchboardFunction: switchboardFunction.publicKey,
+          switchboardRequest: switchboardRequestKeypair.publicKey,
+          switchboardRequestEscrow: switchboardRequestEscrowPubkey,
+          switchboardMint: switchboardProgram.mint.address,
+        })
+        .signers([switchboardRequestKeypair])
+        .rpc();
+      console.log(`[TX] create_user: ${tx}`);
+
+      meter.addReceipt({
+        name: "create_user",
+        tx: tx,
+        rent: [
+          {
+            account: "FunctionRequest",
+            description:
+              "Rent exemption for the Switchboard FunctionRequestAccount",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                await program.provider.connection
+                  .getAccountInfo(switchboardRequest.publicKey)
+                  .then((a) => a?.data.length)
+                  .catch(
+                    () =>
+                      switchboardProgram.attestationAccount
+                        .functionRequestAccountData.size + 512
+                  )
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          },
+          {
+            account: "FunctionRequest Escrow",
+            description: "Wrapped SOL token account used to pay for requests",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                165 /** TokenAccount bytes */
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          },
+          {
+            account: "UserState",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                program.account.userState.size
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          },
+        ],
+      });
+
+      return tx;
     });
-
-    const tx = await program.methods
-      .createUser()
-      .accounts({
-        payer: payer.publicKey,
-        programState: programStatePubkey,
-        user: userPubkey,
-        authority: payer.publicKey,
-        switchboard: switchboardProgram.attestationProgramId,
-        switchboardState: switchboardProgram.attestationProgramState.publicKey,
-        switchboardAttestationQueue: attestationQueue.publicKey,
-        switchboardFunction: switchboardFunction.publicKey,
-        switchboardRequest: switchboardRequestKeypair.publicKey,
-        switchboardRequestEscrow: switchboardRequestEscrow,
-        switchboardMint: switchboardProgram.mint.address,
-      })
-      .signers([switchboardRequestKeypair])
-      .rpc();
-    console.log(`[TX] create_user: ${tx}`);
-
-    switchboardRequest = new FunctionRequestAccount(
-      switchboardProgram,
-      switchboardRequestKeypair.publicKey
-    );
-    switchboardRequestEscrowPubkey = switchboardRequestEscrow;
   }
 
   /////////////////////////////////

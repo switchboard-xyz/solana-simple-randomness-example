@@ -1,24 +1,23 @@
 import {
   AttestationQueueAccount,
-  DEVNET_GENESIS_HASH,
   FunctionAccount,
   FunctionRequestAccount,
-  MAINNET_GENESIS_HASH,
   SwitchboardProgram,
   attestationTypes,
   loadKeypair,
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
 import { SwitchboardRandomnessCallback } from "../target/types/switchboard_randomness_callback";
-import { parseRawMrEnclave, promiseWithTimeout } from "@switchboard-xyz/common";
-import fs from "fs";
 import dotenv from "dotenv";
 import {
+  CHECK_ICON,
+  FAILED_ICON,
   addMrEnclave,
   loadDefaultQueue,
   loadSwitchboardFunctionEnv,
   myMrEnclave,
 } from "./utils";
+import { TestMeter } from "./meter";
 dotenv.config();
 
 interface UserGuessSettledEvent {
@@ -27,12 +26,6 @@ interface UserGuessSettledEvent {
   requestTimestamp: anchor.BN;
   settledTimestamp: anchor.BN;
 }
-
-const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
-  ? parseRawMrEnclave(process.env.MR_ENCLAVE)
-  : fs.existsSync("measurement.txt")
-  ? parseRawMrEnclave(fs.readFileSync("measurement.txt", "utf-8").trim())
-  : undefined;
 
 (async () => {
   const provider = anchor.AnchorProvider.env();
@@ -54,6 +47,10 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
 
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
 
+  const testMeter = new TestMeter(program, "callback-flip", {
+    useSolUnits: true,
+  });
+
   const [programStatePubkey] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("SIMPLE_RANDOMNESS")],
     program.programId
@@ -66,6 +63,10 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
 
   let attestationQueue: AttestationQueueAccount | undefined = undefined;
 
+  /////////////////////////////////////////
+  // GET OR CREATE CREATE PROGRAM STATE  //
+  // GLOBAL ACCT & SWITCHBOARD FUNCTION  //
+  /////////////////////////////////////////
   try {
     const programState = await program.account.programState.fetch(
       programStatePubkey
@@ -81,53 +82,22 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       switchboardProgram,
       functionState.attestationQueue
     );
-
-    if (MrEnclave) {
-      const addEnclaveTxn = await addMrEnclave(
-        switchboardProgram,
-        switchboardFunction,
-        functionState
-      );
-      console.log(
-        `[TX] function_set_config (added MrEnclave): ${addEnclaveTxn}`
-      );
-    }
   } catch (error) {
     if (!`${error}`.includes("Account does not exist or has no data")) {
       throw error;
     }
 
     if (!switchboardFunction) {
+      // First try to load from our .env file
       [switchboardFunction, functionState] = await loadSwitchboardFunctionEnv(
         switchboardProgram
       );
 
+      // Load the default attestation queue by devnet or mainnet genesis hash
       attestationQueue = new AttestationQueueAccount(
         switchboardProgram,
         functionState.attestationQueue
       );
-
-      if (MrEnclave) {
-        const addEnclaveTxn = await addMrEnclave(
-          switchboardProgram,
-          switchboardFunction,
-          functionState
-        );
-        console.log(
-          `[TX] function_set_config (added MrEnclave): ${addEnclaveTxn}`
-        );
-      }
-
-      const tx = await program.methods
-        .initialize()
-        .accounts({
-          payer: payer.publicKey,
-          programState: programStatePubkey,
-          authority: payer.publicKey,
-          switchboardFunction: switchboardFunction.publicKey,
-        })
-        .rpc();
-      console.log(`[TX] initialize: ${tx}`);
     }
 
     if (!switchboardFunction) {
@@ -155,18 +125,39 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       console.log(
         `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${switchboardFunction.publicKey}\n\n`
       );
-
-      const tx = await program.methods
-        .initialize()
-        .accounts({
-          payer: payer.publicKey,
-          programState: programStatePubkey,
-          authority: payer.publicKey,
-          switchboardFunction: switchboardFunction.publicKey,
-        })
-        .rpc();
-      console.log(`[TX] initialize: ${tx}`);
     }
+
+    if (!switchboardFunction) {
+      throw new Error(
+        "Failed to load Switchboard Function from .env file and failed to create a new function on-chain."
+      );
+    }
+
+    try {
+      // If we have a measurement.txt in the workspace, try to add it to
+      // our function.
+      if (myMrEnclave) {
+        const addEnclaveTxn = await addMrEnclave(
+          switchboardProgram,
+          switchboardFunction,
+          functionState
+        );
+        console.log(
+          `[TX] function_set_config (added MrEnclave): ${addEnclaveTxn}`
+        );
+      }
+    } catch {}
+
+    const tx = await program.methods
+      .initialize()
+      .accounts({
+        payer: payer.publicKey,
+        programState: programStatePubkey,
+        authority: payer.publicKey,
+        switchboardFunction: switchboardFunction.publicKey,
+      })
+      .rpc();
+    console.log(`[TX] initialize: ${tx}`);
   }
 
   const [userPubkey] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -194,6 +185,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       throw error;
     }
 
+    // Create a new user account
     const switchboardRequestKeypair = anchor.web3.Keypair.generate();
     const switchboardRequestEscrow = anchor.utils.token.associatedAddress({
       mint: switchboardProgram.mint.address,
@@ -226,16 +218,17 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
     switchboardRequestEscrowPubkey = switchboardRequestEscrow;
   }
 
-  // NOW LETS TRIGGER THE REQUEST
-  const requestStartTime = Date.now();
-  let listener = null;
-  let betTx = "";
-  const [event, slot] = (await promiseWithTimeout(
-    45_000,
-    new Promise(async (resolve, _reject) => {
-      listener = program.addEventListener("UserGuessSettled", (event, slot) => {
-        resolve([event, slot]);
-      });
+  /////////////////////////////////
+  // TRIGGER THE REQUEST   ////////
+  /////////////////////////////////
+
+  const {
+    data: [event, slot],
+    receipt,
+  } = await testMeter.runAndAwaitEvent(
+    "guess",
+    "UserGuessSettled",
+    async (meter) => {
       program.methods
         .guess(1)
         .accounts({
@@ -252,71 +245,36 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         })
         .rpc()
         .then((tx) => {
-          console.log(`[TX] guess: ${tx}\n`);
-          betTx = tx;
-        })
-        .catch((err) => {
-          console.log("here");
-          console.error(err);
-          throw err;
-        });
-    }),
-    "Timed out waiting for 'UserGuessSettled' event"
-  ).catch(async (err) => {
-    const userState = await program.account.userState.fetch(
-      userPubkey,
-      "processed"
-    );
-    console.log(userState);
-    if (listener) {
-      await program.removeEventListener(listener).then(() => {
-        listener = null;
-      });
-    }
-    throw err;
-  })) as unknown as [UserGuessSettledEvent, number];
-  const requestPostTxnTime = Date.now();
-  let requestSettleTime = requestPostTxnTime;
+          meter.addReceipt({
+            tx: tx,
+            name: "guess",
+          });
 
-  await program.removeEventListener(listener).then(() => {
-    listener = null;
-  });
+          console.log(`[TX] guess: ${tx}\n`);
+
+          return tx;
+        });
+    }
+  );
 
   if (event.userWon) {
-    console.log(`You won!`);
+    console.log(`\n${CHECK_ICON} You won!\n`);
   } else {
-    console.log(`Sorry, you lost!`);
+    console.log(`\n${FAILED_ICON} Sorry, you lost!\n`);
   }
 
-  const userState = await program.account.userState.fetch(userPubkey);
+  await testMeter.stop();
 
   console.log(`\n### METRICS`);
 
-  const fullDuration = (requestSettleTime - requestStartTime) / 1000;
-  console.log(`Settlement Time: ${fullDuration.toFixed(3)}`);
-  // console.log(
-  //   `Settlement Slots: ${event.slot - userState.currentRound.requestSlot}`
-  // );
+  const fullDuration = receipt.time.delta;
+  console.log(`Settlement Time: ${fullDuration.toFixed(3)} seconds`);
 
-  // if (fs.existsSync("metrics.csv")) {
-  //   fs.appendFileSync(
-  //     "metrics.csv",
-  //     `${BNtoDateTimeString(event.timestamp)},${event.roundId},${
-  //       event.userWon
-  //     },${event.result},${userState.currentRound.requestSlot},${event.slot},${
-  //       event.slot - userState.currentRound.requestSlot
-  //     },${fullDuration.toFixed(3)},${betTx}\n`
-  //   );
-  // } else {
-  //   fs.writeFileSync(
-  //     "metrics.csv",
-  //     `timestamp,roundId,userWon,result,requestSlot,settledSlot,slotDifference,settlementTime,tx\n${BNtoDateTimeString(
-  //       event.timestamp
-  //     )},${event.roundId},${event.userWon},${event.result},${
-  //       userState.currentRound.requestSlot
-  //     },${event.slot},${
-  //       event.slot - userState.currentRound.requestSlot
-  //     },${fullDuration.toFixed(3)},${betTx}\n`
-  //   );
-  // }
+  console.log(
+    `Cost: ${receipt.balance.delta} ${
+      testMeter.config.balance.units === "sol" ? "SOL" : "lamports"
+    }`
+  );
+
+  testMeter.print();
 })();

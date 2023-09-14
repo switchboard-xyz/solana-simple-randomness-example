@@ -8,7 +8,6 @@ import {
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
 import { SuperSimpleRandomness } from "../target/types/super_simple_randomness";
-import { jsonReplacers, promiseWithTimeout } from "@switchboard-xyz/common";
 import dotenv from "dotenv";
 import chalk from "chalk";
 import {
@@ -16,7 +15,10 @@ import {
   loadSwitchboardFunctionEnv,
   myMrEnclave,
   loadDefaultQueue,
+  CHECK_ICON,
+  FAILED_ICON,
 } from "./utils";
+import { TestMeter } from "./meter";
 dotenv.config();
 
 interface UserGuessSettledEvent {
@@ -38,6 +40,7 @@ interface CostReceipt {
       `You need a ./measurement.txt in the project root or define MR_ENCLAVE in your .env file`
     );
   }
+
   console.log(
     `\n${chalk.green(
       "This script will invoke our Super Simple Randomness program and request a random value between 1 and 10. If SWITCHBOARD_FUNCTION_PUBKEY is not present in your .env file then a new Switchboard Function will be created each time. A Switchboard Request is an instance of a function and allows us to pass custom parameters. In this example we create a new request each time - this is wasteful and requires the user to manually close these after use. See the Switchboard Randomness Callback example program for a more complete implementation where each user has a dedicated request account."
@@ -61,11 +64,9 @@ interface CostReceipt {
   const payer = (provider.wallet as anchor.Wallet).payer;
   console.log(`[env] PAYER: ${payer.publicKey}`);
 
-  const costReceipts: CostReceipt[] = [];
-
-  const startingPayerBalance = await program.provider.connection.getBalance(
-    payer.publicKey
-  );
+  const testMeter = new TestMeter(program, "simple-flip", {
+    useSolUnits: true,
+  });
 
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
 
@@ -93,12 +94,9 @@ interface CostReceipt {
     );
 
     if (addEnclaveTxn) {
-      costReceipts.push({
-        name: "function_set_config",
-        description:
-          "transaction fee to add the MrEnclave to our function's config",
-        cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
-      });
+      console.log(
+        `[TX] function_set_config (added MrEnclave): ${addEnclaveTxn}`
+      );
     }
   } else {
     // Create a new Switchboard Function
@@ -111,45 +109,48 @@ interface CostReceipt {
     // Get the Attestation queue address from the clusters genesis hash
     attestationQueue = await loadDefaultQueue(switchboardProgram);
 
-    console.log(`Initializing new SwitchboardFunction ...`);
-    let functionInitTx: string;
+    const { data: functionInitTx, receipt: functionInitReceipt } =
+      await testMeter.run("function_init", async (meter) => {
+        let tx: string;
+        [switchboardFunction, tx] = await FunctionAccount.create(
+          switchboardProgram,
+          {
+            name: "SIMPLE-RANDOMNESS",
+            metadata:
+              "https://github.com/switchboard-xyz/solana-simple-randomness-example/tree/main/switchboard-function",
+            container: process.env.DOCKERHUB_IMAGE_NAME,
+            containerRegistry: "dockerhub",
+            version: "latest",
+            attestationQueue,
+            authority: payer.publicKey,
+            mrEnclave: myMrEnclave,
+          }
+        );
 
-    [switchboardFunction, functionInitTx] = await FunctionAccount.create(
-      switchboardProgram,
-      {
-        name: "SIMPLE-RANDOMNESS",
-        metadata:
-          "https://github.com/switchboard-xyz/solana-simple-randomness-example/tree/main/switchboard-function",
-        container: process.env.DOCKERHUB_IMAGE_NAME,
-        containerRegistry: "dockerhub",
-        version: "latest",
-        attestationQueue,
-        authority: payer.publicKey,
-        mrEnclave: myMrEnclave,
-      }
-    );
+        console.log(
+          `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${switchboardFunction.publicKey}\n\n`
+        );
 
-    console.log(
-      `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${switchboardFunction.publicKey}\n\n`
-    );
+        meter.addReceipt({
+          name: "function_init",
+          tx: tx,
+          rent: [
+            {
+              account: "FunctionAccount",
+              description: "Rent exemption for the Switchboard FunctionAccount",
+              cost:
+                (await program.provider.connection.getMinimumBalanceForRentExemption(
+                  switchboardProgram.attestationAccount.functionAccountData.size
+                )) / anchor.web3.LAMPORTS_PER_SOL,
+            },
+          ],
+        });
+
+        return tx;
+      });
 
     // Log the txn signatures and add the cost receipts for easier debugging
     console.log(`[TX] function_init: ${functionInitTx}`);
-    costReceipts.push(
-      {
-        name: "FunctionAccount - rent",
-        description: "Rent exemption for the Switchboard FunctionAccount",
-        cost:
-          (await program.provider.connection.getMinimumBalanceForRentExemption(
-            switchboardProgram.attestationAccount.functionAccountData.size
-          )) / anchor.web3.LAMPORTS_PER_SOL,
-      },
-      {
-        name: "function_init",
-        description: "Transaction fee to create the function account",
-        cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
-      }
-    );
   }
 
   const attestationQueueState = await attestationQueue.loadData();
@@ -176,17 +177,14 @@ interface CostReceipt {
     switchboardRequestKeypair.publicKey
   );
 
-  // CREATE AND TRIGGER THE REQUEST
-  const requestStartTime = Date.now();
-  let listener = null;
-  let betTx = "";
-  const [event, slot] = (await promiseWithTimeout(
-    45_000,
-    new Promise(async (resolve, _reject) => {
-      listener = program.addEventListener("UserGuessSettled", (event, slot) => {
-        resolve([event, slot]);
-      });
-      program.methods
+  const {
+    data: [event, slot],
+    receipt: guessReceipt,
+  } = await testMeter.runAndAwaitEvent(
+    "guess",
+    "UserGuessSettled",
+    async (meter) => {
+      const tx = await program.methods
         .guess(1)
         .accounts({
           payer: payer.publicKey,
@@ -202,136 +200,75 @@ interface CostReceipt {
           switchboardMint: switchboardProgram.mint.address,
         })
         .signers([switchboardRequestKeypair])
-        .rpc()
-        .then(async (tx) => {
-          console.log(`[TX] guess: ${tx}\n`);
-          betTx = tx;
-        });
-    }),
-    "Timed out waiting for 'UserGuessSettled' event"
-  ).catch(async (err) => {
-    const userState = await program.account.userState.fetch(
-      userPubkey,
-      "processed"
-    );
-    console.log(userState, jsonReplacers, 2);
-    if (listener) {
-      await program.removeEventListener(listener).then(() => {
-        listener = null;
+        .rpc();
+
+      meter.addReceipt({
+        name: "guess",
+        tx: tx,
+        sbFee: attestationQueueState.reward,
+        rent: [
+          {
+            account: "FunctionRequest",
+            description:
+              "Rent exemption for the Switchboard FunctionRequestAccount",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                await program.provider.connection
+                  .getAccountInfo(switchboardRequest.publicKey)
+                  .then((a) => a?.data.length)
+                  .catch(
+                    () =>
+                      switchboardProgram.attestationAccount
+                        .functionRequestAccountData.size + 512
+                  )
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          },
+          {
+            account: "FunctionRequest Escrow",
+            description: "Wrapped SOL token account used to pay for requests",
+            cost:
+              (await program.provider.connection.getMinimumBalanceForRentExemption(
+                await program.provider.connection
+                  .getAccountInfo(switchboardRequestEscrowPubkey)
+                  .then((a) => a?.data.length)
+                  .catch(() => 165 /** Token account bytes */)
+              )) / anchor.web3.LAMPORTS_PER_SOL,
+          },
+          ...(initialUserAccountInfo
+            ? []
+            : [
+                {
+                  account: "UserState",
+                  cost:
+                    (await program.provider.connection.getMinimumBalanceForRentExemption(
+                      program.account.userState.size
+                    )) / anchor.web3.LAMPORTS_PER_SOL,
+                },
+              ]),
+          ,
+        ],
       });
     }
-    throw err;
-  })) as unknown as [UserGuessSettledEvent, number];
-
-  const requestPostTxnTime = Date.now();
-  let requestSettleTime = requestPostTxnTime;
-
-  await program.removeEventListener(listener).then(() => {
-    listener = null;
-  });
+  );
 
   if (event.userWon) {
-    console.log(`You won!`);
+    console.log(`\n${CHECK_ICON} You won!\n`);
   } else {
-    console.log(`Sorry, you lost!`);
+    console.log(`\n${FAILED_ICON} Sorry, you lost!\n`);
   }
 
-  costReceipts.push({
-    name: "Switchboard Fee",
-    description:
-      "Switchboard fee for the request to reward oracles for executing your function request",
-    cost: attestationQueueState.reward / anchor.web3.LAMPORTS_PER_SOL,
-  });
+  await testMeter.stop();
 
   console.log(`\n### METRICS`);
 
-  const fullDuration = (requestSettleTime - requestStartTime) / 1000;
+  const fullDuration = guessReceipt.time.delta;
   console.log(`Settlement Time: ${fullDuration.toFixed(3)} seconds`);
 
-  ////////////////////////////////////////////////////////////////
-  // COST ESTIMATIONS
-  ////////////////////////////////////////////////////////////////
-  console.log(`\n### COST`);
-  costReceipts.push(
-    {
-      name: "guess",
-      description: "transaction fee to make a guess",
-      cost: 5000 / anchor.web3.LAMPORTS_PER_SOL,
-    },
-    {
-      name: "FunctionRequest - rent",
-      description: "Rent exemption for the Switchboard FunctionRequestAccount",
-      cost:
-        (await program.provider.connection.getMinimumBalanceForRentExemption(
-          await program.provider.connection
-            .getAccountInfo(switchboardRequest.publicKey)
-            .then((a) => a?.data.length)
-            .catch(
-              () =>
-                switchboardProgram.attestationAccount.functionRequestAccountData
-                  .size + 512
-            )
-        )) / anchor.web3.LAMPORTS_PER_SOL,
-    },
-    {
-      name: "FunctionRequest Escrow - rent",
-      description: "Wrapped SOL token account used to pay for requests",
-      cost:
-        (await program.provider.connection.getMinimumBalanceForRentExemption(
-          await program.provider.connection
-            .getAccountInfo(switchboardRequestEscrowPubkey)
-            .then((a) => a?.data.length)
-            .catch(() => 165 /** Token account bytes */)
-        )) / anchor.web3.LAMPORTS_PER_SOL,
-    }
-  );
-  if (!initialUserAccountInfo) {
-    costReceipts.push({
-      name: "UserState - rent",
-      description:
-        "Rent exemption for the randomness program's UserState account",
-      cost:
-        (await program.provider.connection.getMinimumBalanceForRentExemption(
-          program.account.userState.size
-        )) / anchor.web3.LAMPORTS_PER_SOL,
-    });
-  } else {
-    console.log(
-      `[info] UserState already exists for this user - init_if_needed was not triggered`
-    );
-  }
-
-  const payerBalanceDelta =
-    (startingPayerBalance -
-      (await program.provider.connection.getBalance(payer.publicKey))) /
-    anchor.web3.LAMPORTS_PER_SOL;
   console.log(
-    `Payer Balance \u0394: ${chalk.red(`- ${payerBalanceDelta}`)} SOL`
+    `Cost: ${guessReceipt.balance.delta} ${
+      testMeter.config.balance.units === "sol" ? "SOL" : "lamports"
+    }`
   );
 
-  const switchboardFunctionCost = attestationQueueState.reward;
-  console.log(
-    `Switchboard Fee: ${
-      switchboardFunctionCost / anchor.web3.LAMPORTS_PER_SOL
-    } SOL (per request)`
-  );
-
-  const switchboardRequestAccountCost =
-    await program.provider.connection.getMinimumBalanceForRentExemption(
-      (
-        await program.provider.connection.getAccountInfo(
-          switchboardRequest.publicKey
-        )
-      ).data.length
-    );
-  console.log(
-    `Request Account Rent: ${
-      switchboardRequestAccountCost / anchor.web3.LAMPORTS_PER_SOL
-    } SOL (per account)`
-  );
-  console.log(
-    `\t${chalk.blue("NOTE: Request accounts can be closed after use.")}`
-  );
-
-  console.table(costReceipts);
+  testMeter.print();
 })();

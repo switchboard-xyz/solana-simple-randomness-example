@@ -7,16 +7,18 @@ import {
   attestationTypes,
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
-import {
-  jsonReplacers,
-  parseRawMrEnclave,
-  promiseWithTimeout,
-} from "@switchboard-xyz/common";
+import { parseRawMrEnclave } from "@switchboard-xyz/common";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 import chalk from "chalk";
 dotenv.config();
+
+export const PLUS_ICON = chalk.green("\u002B ");
+
+export const CHECK_ICON = chalk.green("\u2714 ");
+
+export const FAILED_ICON = chalk.red("\u2717 ");
 
 export async function loadDefaultQueue(switchboardProgram: SwitchboardProgram) {
   const genesisHash =

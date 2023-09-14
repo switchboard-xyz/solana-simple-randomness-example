@@ -5,6 +5,7 @@ import {
   FunctionRequestAccount,
   MAINNET_GENESIS_HASH,
   SwitchboardProgram,
+  attestationTypes,
   loadKeypair,
 } from "@switchboard-xyz/solana.js";
 import * as anchor from "@coral-xyz/anchor";
@@ -12,6 +13,12 @@ import { SwitchboardRandomnessCallback } from "../target/types/switchboard_rando
 import { parseRawMrEnclave, promiseWithTimeout } from "@switchboard-xyz/common";
 import fs from "fs";
 import dotenv from "dotenv";
+import {
+  addMrEnclave,
+  loadDefaultQueue,
+  loadSwitchboardFunctionEnv,
+  myMrEnclave,
+} from "./utils";
 dotenv.config();
 
 interface UserGuessSettledEvent {
@@ -38,6 +45,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         )
       : provider
   );
+
   const payer = (provider.wallet as anchor.Wallet).payer;
   console.log(`PAYER: ${payer.publicKey}`);
 
@@ -52,9 +60,11 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   );
   console.log(`PROGRAM_STATE: ${programStatePubkey}`);
 
-  // verify House is created and load Switchboard Function
-  let switchboardFunction: FunctionAccount;
-  let attestationQueuePubkey: anchor.web3.PublicKey;
+  let switchboardFunction: FunctionAccount | undefined = undefined;
+  let functionState: attestationTypes.FunctionAccountData | undefined =
+    undefined;
+
+  let attestationQueue: AttestationQueueAccount | undefined = undefined;
 
   try {
     const programState = await program.account.programState.fetch(
@@ -66,86 +76,68 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
       switchboardProgram,
       programState.switchboardFunction
     );
-    const functionState = await switchboardFunction.loadData();
-    attestationQueuePubkey = functionState.attestationQueue;
+    functionState = await switchboardFunction.loadData();
+    attestationQueue = new AttestationQueueAccount(
+      switchboardProgram,
+      functionState.attestationQueue
+    );
 
-    if (MrEnclave && MrEnclave.byteLength === 32) {
-      let functionMrEnclaves = functionState.mrEnclaves.filter(
-        (b) =>
-          Buffer.compare(Buffer.from(b), Buffer.from(new Array(32).fill(0))) !==
-          0
+    if (MrEnclave) {
+      const addEnclaveTxn = await addMrEnclave(
+        switchboardProgram,
+        switchboardFunction,
+        functionState
       );
-      // if we need to, add MrEnclave measurement
-      const mrEnclaveIdx = functionMrEnclaves.findIndex(
-        (b) => Buffer.compare(Buffer.from(b), Buffer.from(MrEnclave)) === 0
+      console.log(
+        `[TX] function_set_config (added MrEnclave): ${addEnclaveTxn}`
       );
-      if (mrEnclaveIdx === -1) {
-        console.log(
-          `MrEnclave missing from Function, adding to function config ...`
-        );
-        // we need to add the MrEnclave measurement
-        const mrEnclavesLen = functionMrEnclaves.push(Array.from(MrEnclave));
-        if (mrEnclavesLen > 32) {
-          functionMrEnclaves = functionMrEnclaves.slice(32 - mrEnclavesLen);
-        }
-        const functionSetConfigTx = await switchboardFunction.setConfig({
-          mrEnclaves: functionMrEnclaves,
-        });
-        console.log(`[TX] function_set_config: ${functionSetConfigTx}`);
-      }
     }
   } catch (error) {
     if (!`${error}`.includes("Account does not exist or has no data")) {
       throw error;
     }
 
-    // Attempt to load from env file
-    if (process.env.SWITCHBOARD_FUNCTION_PUBKEY) {
-      try {
-        const myFunction = new FunctionAccount(
+    if (!switchboardFunction) {
+      [switchboardFunction, functionState] = await loadSwitchboardFunctionEnv(
+        switchboardProgram
+      );
+
+      attestationQueue = new AttestationQueueAccount(
+        switchboardProgram,
+        functionState.attestationQueue
+      );
+
+      if (MrEnclave) {
+        const addEnclaveTxn = await addMrEnclave(
           switchboardProgram,
-          process.env.SWITCHBOARD_FUNCTION_PUBKEY
+          switchboardFunction,
+          functionState
         );
-        const functionState = await myFunction.loadData();
-        if (functionState.authority.equals(payer.publicKey)) {
-          throw new Error(
-            `$SWITCHBOARD_FUNCTION_PUBKEY.authority mismatch, expected ${payer.publicKey}, received ${functionState.authority}`
-          );
-        }
-        switchboardFunction = myFunction;
-        attestationQueuePubkey = functionState.attestationQueue;
-      } catch (error) {
-        console.error(
-          `$SWITCHBOARD_FUNCTION_PUBKEY in your .env file is incorrect, please fix`
+        console.log(
+          `[TX] function_set_config (added MrEnclave): ${addEnclaveTxn}`
         );
       }
+
+      const tx = await program.methods
+        .initialize()
+        .accounts({
+          payer: payer.publicKey,
+          programState: programStatePubkey,
+          authority: payer.publicKey,
+          switchboardFunction: switchboardFunction.publicKey,
+        })
+        .rpc();
+      console.log(`[TX] initialize: ${tx}`);
     }
 
-    if (!switchboardFunction || !attestationQueuePubkey) {
-      if (!process.env.DOCKERHUB_IMAGE_NAME) {
-        throw new Error(
-          `You need to set DOCKERHUB_IMAGE_NAME in your .env file to create a new Switchboard Function. Example:\n\tDOCKERHUB_IMAGE_NAME=gallynaut/solana-simple-randomness-function`
-        );
-      }
-      const genesisHash = await provider.connection.getGenesisHash();
-      const attestationQueueAddress =
-        genesisHash === MAINNET_GENESIS_HASH
-          ? "2ie3JZfKcvsRLsJaP5fSo43gUo1vsurnUAtAgUdUAiDG"
-          : genesisHash === DEVNET_GENESIS_HASH
-          ? "CkvizjVnm2zA5Wuwan34NhVT3zFc7vqUyGnA6tuEF5aE"
-          : undefined;
-      if (!attestationQueueAddress) {
-        throw new Error(
-          `The request script currently only works on mainnet-beta or devnet (if SWITCHBOARD_FUNCTION_PUBKEY is not set in your .env file))`
-        );
-      }
+    if (!switchboardFunction) {
+      // Get the Attestation queue address from the clusters genesis hash
+      attestationQueue = await loadDefaultQueue(switchboardProgram);
+
       console.log(`Initializing new SwitchboardFunction ...`);
-      const attestationQueue = new AttestationQueueAccount(
-        switchboardProgram,
-        attestationQueueAddress
-      );
-      await attestationQueue.loadData();
-      const [functionAccount, functionInitTx] = await FunctionAccount.create(
+      let functionInitTx: string;
+
+      [switchboardFunction, functionInitTx] = await FunctionAccount.create(
         switchboardProgram,
         {
           name: "SIMPLE-RANDOMNESS",
@@ -156,29 +148,25 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
           version: "latest",
           attestationQueue,
           authority: payer.publicKey,
-          mrEnclave: MrEnclave,
+          mrEnclave: myMrEnclave,
         }
       );
-      console.log(`[TX] function_init: ${functionInitTx}`);
 
       console.log(
-        `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${functionAccount.publicKey}\n\n`
+        `\nMake sure to add the following to your .env file:\n\tSWITCHBOARD_FUNCTION_PUBKEY=${switchboardFunction.publicKey}\n\n`
       );
 
-      switchboardFunction = functionAccount;
-      attestationQueuePubkey = attestationQueue.publicKey;
+      const tx = await program.methods
+        .initialize()
+        .accounts({
+          payer: payer.publicKey,
+          programState: programStatePubkey,
+          authority: payer.publicKey,
+          switchboardFunction: switchboardFunction.publicKey,
+        })
+        .rpc();
+      console.log(`[TX] initialize: ${tx}`);
     }
-
-    const tx = await program.methods
-      .initialize()
-      .accounts({
-        payer: payer.publicKey,
-        programState: programStatePubkey,
-        authority: payer.publicKey,
-        switchboardFunction: switchboardFunction.publicKey,
-      })
-      .rpc();
-    console.log(`[TX] initialize: ${tx}`);
   }
 
   const [userPubkey] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -221,7 +209,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         authority: payer.publicKey,
         switchboard: switchboardProgram.attestationProgramId,
         switchboardState: switchboardProgram.attestationProgramState.publicKey,
-        switchboardAttestationQueue: attestationQueuePubkey,
+        switchboardAttestationQueue: attestationQueue.publicKey,
         switchboardFunction: switchboardFunction.publicKey,
         switchboardRequest: switchboardRequestKeypair.publicKey,
         switchboardRequestEscrow: switchboardRequestEscrow,
@@ -257,7 +245,7 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
           switchboard: switchboardProgram.attestationProgramId,
           switchboardState:
             switchboardProgram.attestationProgramState.publicKey,
-          switchboardAttestationQueue: attestationQueuePubkey,
+          switchboardAttestationQueue: attestationQueue.publicKey,
           switchboardFunction: switchboardFunction.publicKey,
           switchboardRequest: switchboardRequest.publicKey,
           switchboardRequestEscrow: switchboardRequestEscrowPubkey,
@@ -266,6 +254,11 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
         .then((tx) => {
           console.log(`[TX] guess: ${tx}\n`);
           betTx = tx;
+        })
+        .catch((err) => {
+          console.log("here");
+          console.error(err);
+          throw err;
         });
     }),
     "Timed out waiting for 'UserGuessSettled' event"

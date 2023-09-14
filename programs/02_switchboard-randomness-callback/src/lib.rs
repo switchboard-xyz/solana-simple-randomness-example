@@ -96,11 +96,10 @@ pub mod switchboard_randomness_callback {
     }
 
     pub fn guess(ctx: Context<Guess>, guess: u32) -> Result<()> {
-        let mut user = ctx.accounts.user.load_mut()?;
-
-        if user.request_timestamp > 0
-            && user.settled_timestamp == 0
-            && Clock::get()?.unix_timestamp - user.request_timestamp < REQUEST_TIMEOUT
+        if ctx.accounts.user.load()?.request_timestamp > 0
+            && ctx.accounts.user.load()?.settled_timestamp == 0
+            && Clock::get()?.unix_timestamp - ctx.accounts.user.load()?.request_timestamp
+                < REQUEST_TIMEOUT
         {
             return Err(error!(SimpleRandomnessError::RequestNotReady));
         }
@@ -122,6 +121,14 @@ pub mod switchboard_randomness_callback {
             system_program: ctx.accounts.system_program.to_account_info(),
             token_program: ctx.accounts.token_program.to_account_info(),
         };
+
+        let user_authority_pubkey = ctx.accounts.authority.key();
+        let seeds = &[
+            USER_SEED,
+            user_authority_pubkey.as_ref(),
+            &[ctx.accounts.user.load()?.bump],
+        ];
+
         request_trigger_ctx.invoke_signed(
             ctx.accounts.switchboard.clone(),
             // bounty - optional fee to reward oracles for priority processing
@@ -134,12 +141,10 @@ pub mod switchboard_randomness_callback {
             // valid_after_slot - schedule a request to execute in N slots
             // default: 0 slots, valid immediately for oracles to process
             None,
-            &[&[
-                USER_SEED,
-                ctx.accounts.authority.key().as_ref(),
-                &[user.bump],
-            ]],
+            &[seeds],
         )?;
+
+        let mut user = ctx.accounts.user.load_mut()?;
 
         // Set new guess data
         user.guess = guess;
@@ -348,9 +353,11 @@ pub struct Guess<'info> {
 
     // RANDOMNESS PROGRAM ACCOUNTS
     #[account(
+        mut,
         seeds = [USER_SEED, authority.key().as_ref()],
         bump = user.load()?.bump,
         has_one = switchboard_request,
+        has_one = authority,
     )]
     pub user: AccountLoader<'info, UserState>,
 

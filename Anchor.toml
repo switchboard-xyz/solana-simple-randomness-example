@@ -11,11 +11,11 @@ super_simple_randomness = "E5MAszjz8qZZDHKqQ21g5wYuhMTjMbk1L4L4jBFXMgqG"
 switchboard_randomness_callback = "5bKuRru1qgEeQUXSAJvsXc8hZEGpCucEaaDQkmyd8j6v"
 
 [provider]
-cluster = "Devnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+test = "pnpm exec ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.test.ts"
 callback-flip = "tsx ./scripts/callback-flip.ts"
 simple-flip = "tsx ./scripts/simple-flip.ts"
 update-measurement = "tsx ./scripts/update-measurement.ts"

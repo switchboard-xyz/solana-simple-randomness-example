@@ -5,10 +5,12 @@ skip-lint = false
 [programs.localnet]
 super_simple_randomness = "E5MAszjz8qZZDHKqQ21g5wYuhMTjMbk1L4L4jBFXMgqG"
 switchboard_randomness_callback = "5bKuRru1qgEeQUXSAJvsXc8hZEGpCucEaaDQkmyd8j6v"
+scheduled_lottery_request = "6AKXZiKbmj3D45bDZpa9fo6vUV4qGeeeRCZ5qRhE4Ve4"
 
 [programs.devnet]
 super_simple_randomness = "E5MAszjz8qZZDHKqQ21g5wYuhMTjMbk1L4L4jBFXMgqG"
 switchboard_randomness_callback = "5bKuRru1qgEeQUXSAJvsXc8hZEGpCucEaaDQkmyd8j6v"
+scheduled_lottery_request = "6AKXZiKbmj3D45bDZpa9fo6vUV4qGeeeRCZ5qRhE4Ve4"
 
 [provider]
 cluster = "Localnet"
@@ -21,7 +23,7 @@ simple-flip = "tsx ./scripts/simple-flip.ts"
 update-measurement = "tsx ./scripts/update-measurement.ts"
 
 [test.validator]
-url = "https://api.mainnet-beta.solana.com"
+url = "https://api.devnet.solana.com"
 
 [test]
 startup_wait = 15000

@@ -3111,14 +3111,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "scheduled-lottery-request"
-version = "0.1.0"
-dependencies = [
- "anchor-spl",
- "switchboard-solana",
-]
-
-[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3586,6 +3578,16 @@ dependencies = [
  "env_logger",
  "lazy_static",
  "log",
+]
+
+[[package]]
+name = "solana-lottery-function"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "futures",
+ "switchboard-solana",
+ "tokio",
 ]
 
 [[package]]
@@ -4252,14 +4254,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
-name = "super-simple-randomness"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "switchboard-solana",
-]
-
-[[package]]
 name = "superslice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4268,6 +4262,8 @@ checksum = "ab16ced94dbd8a46c82fd81e3ed9a8727dac2977ea869d217bcc4ea1f122e81f"
 [[package]]
 name = "switchboard-common"
 version = "0.8.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c9e28848b864786d8b1835f1f0c4c7e65190d9c17b246e5e21cc2457a70b176"
 dependencies = [
  "envy",
  "getrandom 0.2.10",
@@ -4279,15 +4275,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "switchboard-randomness-callback"
-version = "0.1.0"
-dependencies = [
- "switchboard-solana",
-]
-
-[[package]]
 name = "switchboard-solana"
 version = "0.28.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a978513e0d3f54444698efb1737c8bcf366e2131e03ccfdf24c22210b8d755c"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -4676,9 +4667,9 @@ checksum = "92888ba5573ff080736b3648696b70cafad7d250551175acbaa4e0385b3e1460"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.11"
+version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "301abaae475aa91687eb82514b328ab47a211a533026cb25fc3e519b86adfc3c"
+checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
 
 [[package]]
 name = "unicode-normalization"

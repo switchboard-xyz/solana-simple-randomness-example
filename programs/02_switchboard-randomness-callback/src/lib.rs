@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 // Program: Solana Simple Randomness
 // This Solana program will allow you to request a new random value for a given user.
 // The following instructions are supported:
@@ -74,17 +75,15 @@ pub mod switchboard_randomness_callback {
         );
         request_init_ctx.invoke(
             ctx.accounts.switchboard.clone(),
-            &FunctionRequestInitParams {
-                // max_container_params_len - the length of the vec containing the container params
-                // default: 256 bytes
-                max_container_params_len: Some(512),
-                // container_params - the container params
-                // default: empty vec
-                container_params: request_params.into_bytes(),
-                // garbage_collection_slot - the slot when the request can be closed by anyone and is considered dead
-                // default: None, only authority can close the request
-                garbage_collection_slot: None,
-            },
+            // max_container_params_len - the length of the vec containing the container params
+            // default: 256 bytes
+            Some(512),
+            // container_params - the container params
+            // default: empty vec
+            Some(request_params.into_bytes()),
+            // garbage_collection_slot - the slot when the request can be closed by anyone and is considered dead
+            // default: None, only authority can close the request
+            None,
         )?;
 
         let mut user = ctx.accounts.user.load_init()?;
@@ -197,6 +196,7 @@ pub mod switchboard_randomness_callback {
         };
         close_ctx.invoke_signed(
             ctx.accounts.switchboard.clone(),
+            Some(true),
             &[&[
                 USER_SEED,
                 ctx.accounts.authority.key().as_ref(),
@@ -442,12 +442,9 @@ pub struct Close<'info> {
     #[account(address = anchor_spl::token::spl_token::native_mint::ID)]
     pub switchboard_mint: Account<'info, Mint>,
 
-    // TOKEN ACCOUNTS
-    pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
-
     // SYSTEM ACCOUNTS
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[error_code]

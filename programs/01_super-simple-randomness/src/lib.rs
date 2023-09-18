@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 // Program: Solana Simple Randomness
 // This Solana program will allow you to request a new random value for a given user.
 // The following instructions are supported:
@@ -82,7 +83,9 @@ pub mod super_simple_randomness {
         // https://docs.rs/switchboard-solana/latest/switchboard_solana/attestation_program/instructions/request_init_and_trigger/index.html
         let request_init_ctx = FunctionRequestInitAndTrigger {
             request: ctx.accounts.switchboard_request.clone(),
+            authority: ctx.accounts.user.to_account_info(),
             function: ctx.accounts.switchboard_function.to_account_info(),
+            function_authority: None,
             escrow: ctx.accounts.switchboard_request_escrow.clone(),
             mint: ctx.accounts.switchboard_mint.to_account_info(),
             state: ctx.accounts.switchboard_state.to_account_info(),
@@ -92,7 +95,14 @@ pub mod super_simple_randomness {
             token_program: ctx.accounts.token_program.to_account_info(),
             associated_token_program: ctx.accounts.associated_token_program.to_account_info(),
         };
-        request_init_ctx.invoke(
+        let user_authority_pubkey = ctx.accounts.authority.key();
+        let seeds = &[
+            USER_SEED,
+            user_authority_pubkey.as_ref(),
+            &[ctx.accounts.user.bump],
+        ];
+
+        request_init_ctx.invoke_signed(
             ctx.accounts.switchboard.clone(),
             // bounty - optional fee to reward oracles for priority processing
             // default: 0 lamports
@@ -113,6 +123,8 @@ pub mod super_simple_randomness {
             // valid_after_slot - schedule a request to execute in N slots
             // default: 0 slots, valid immediately for oracles to process
             None,
+            // signer seeds
+            &[seeds],
         )?;
 
         Ok(())
@@ -208,21 +220,21 @@ pub struct Guess<'info> {
 pub struct Settle<'info> {
     // RANDOMNESS PROGRAM ACCOUNTS
     #[account(
-        mut,
-        seeds = [USER_SEED, user.authority.as_ref()],
-        bump = user.bump,
-        has_one = switchboard_request,
-    )]
+    mut,
+    seeds = [USER_SEED, user.authority.as_ref()],
+    bump = user.bump,
+    has_one = switchboard_request,
+)]
     pub user: Account<'info, UserState>,
 
     // SWITCHBOARD ACCOUNTS
     pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
     #[account(
-        constraint = switchboard_request.validate_signer(
-            &switchboard_function.to_account_info(),
-            &enclave_signer.to_account_info()
-            )?
-        )]
+    constraint = switchboard_request.validate_signer(
+        &switchboard_function.to_account_info(),
+        &enclave_signer.to_account_info()
+        )?
+)]
     pub switchboard_request: Box<Account<'info, FunctionRequestAccountData>>,
     pub enclave_signer: Signer<'info>,
 }

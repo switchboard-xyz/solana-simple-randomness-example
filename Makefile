@@ -22,9 +22,9 @@ anchor_build :; anchor build
 anchor_publish:; make -j 2 simple-flip-deploy callback-flip-deploy
 
 docker_build: 
-	docker buildx build --platform linux/amd64 --pull -f Dockerfile -t ${DOCKER_IMAGE_NAME} --load ./
+	docker buildx build --platform linux/amd64 --pull -f ./switchboard-function/Dockerfile -t ${DOCKER_IMAGE_NAME} --load ./switchboard-function
 docker_publish: 
-	docker buildx build --platform linux/amd64 --pull -f Dockerfile -t ${DOCKER_IMAGE_NAME} --push ./
+	docker buildx build --platform linux/amd64 --pull -f ./switchboard-function/Dockerfile -t ${DOCKER_IMAGE_NAME} --push ./switchboard-function
 
 build: anchor_build docker_build measurement
 

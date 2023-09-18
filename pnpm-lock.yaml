@@ -12,8 +12,8 @@ dependencies:
     specifier: ^2.3.6
     version: 2.3.6
   '@switchboard-xyz/solana.js':
-    specifier: ^2.6.3
-    version: 2.6.3
+    specifier: ^2.7.1
+    version: 2.7.1
   chalk:
     specifier: '4'
     version: 4.1.2
@@ -442,8 +442,8 @@ packages:
       yaml: 2.3.2
     dev: false
 
-  /@switchboard-xyz/solana.js@2.6.3:
-    resolution: {integrity: sha512-1QdQq6u3oJ/7CVcRBBLGSDufRsZ1Rm4YucEOttop9WIsHFXmoVIS/PW6shw5eCaKvuHJryzc5JHpGx3PyJ/7BA==}
+  /@switchboard-xyz/solana.js@2.7.1:
+    resolution: {integrity: sha512-NsFDpIsWmXKlKkDIRMi48IRPKTC7kZGAqleOzF4p3wihYpFIzuaSSqEvrWNza/W8X2xaY59UWd4rmthX2Wip8g==}
     engines: {node: '>=16.0.0', npm: '>=7.0.0'}
     dependencies:
       '@coral-xyz/anchor': 0.28.0

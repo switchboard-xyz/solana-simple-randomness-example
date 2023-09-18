@@ -10,6 +10,7 @@ import {
   attestationTypes,
 } from "@switchboard-xyz/solana.js";
 import { parseRawMrEnclave } from "@switchboard-xyz/common";
+import { loadSwitchboard } from "./utils";
 
 // This value doesnt matter for our tests because we are not validating
 // the execution off-chain.
@@ -18,7 +19,7 @@ const MRENCLAVE = parseRawMrEnclave(
   true
 );
 
-describe("solana-simple-randomness", () => {
+describe("super-simple-randomness", () => {
   const provider = anchor.AnchorProvider.env();
   const payer = (provider.wallet as anchor.Wallet).payer;
 
@@ -26,6 +27,8 @@ describe("solana-simple-randomness", () => {
 
   const program = anchor.workspace
     .SuperSimpleRandomness as Program<SuperSimpleRandomness>;
+
+  console.log(`SuperSimpleRandomness PID: ${program.programId}`);
 
   // Derive our users pubkey for the randomness program.
   const [userPubkey] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -41,21 +44,10 @@ describe("solana-simple-randomness", () => {
   const switchboardRequestKeypair = anchor.web3.Keypair.generate();
 
   before(async () => {
-    const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
-
-    switchboard = await AttestationQueueAccount.bootstrapNewQueue(
-      switchboardProgram
+    [switchboard, switchboardFunction] = await loadSwitchboard(
+      provider,
+      MRENCLAVE
     );
-
-    [switchboardFunction] =
-      await switchboard.attestationQueue.account.createFunction({
-        name: "test function",
-        metadata: "this function handles XYZ for my protocol",
-        schedule: "", // on-demand updates only
-        container: "org/container",
-        version: "latest",
-        mrEnclave: MRENCLAVE,
-      });
   });
 
   ///////////////////////////////////////////////////////

@@ -2,10 +2,12 @@
 FROM switchboardlabs/sgx-function AS builder
 
 WORKDIR /home/root/switchboard-function
-COPY ./switchboard-function/Cargo.toml ./switchboard-function/Cargo.lock ./
-COPY ./switchboard-function/src ./src/
+COPY ./Cargo.toml ./Cargo.lock ./
+COPY ./src ./src/
 
-RUN cargo build --release && \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,id=${TARGETPLATFORM} \
+    --mount=type=cache,target=target,id=${TARGETPLATFORM} \
+    cargo build --release && \
     cargo strip && \
     mv target/release/simple-randomness-function /sgx/app
 

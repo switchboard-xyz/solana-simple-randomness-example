@@ -220,11 +220,11 @@ pub struct Guess<'info> {
 pub struct Settle<'info> {
     // RANDOMNESS PROGRAM ACCOUNTS
     #[account(
-    mut,
-    seeds = [USER_SEED, user.authority.as_ref()],
-    bump = user.bump,
-    has_one = switchboard_request,
-)]
+        mut,
+        seeds = [USER_SEED, user.authority.as_ref()],
+        bump = user.bump,
+        has_one = switchboard_request,
+    )]
     pub user: Account<'info, UserState>,
 
     // SWITCHBOARD ACCOUNTS
@@ -234,7 +234,7 @@ pub struct Settle<'info> {
         &switchboard_function.to_account_info(),
         &enclave_signer.to_account_info()
         )?
-)]
+    )]
     pub switchboard_request: Box<Account<'info, FunctionRequestAccountData>>,
     pub enclave_signer: Signer<'info>,
 }

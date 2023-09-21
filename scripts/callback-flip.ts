@@ -244,6 +244,23 @@ interface UserGuessSettledEvent {
     );
     const requestState = await switchboardRequest.loadData();
     switchboardRequestEscrowPubkey = requestState.escrow;
+
+    // Add the MrEnclave value to our config if its missing
+    const switchboardFunction = new FunctionAccount(
+      switchboardProgram,
+      requestState.function
+    );
+    const functionState = await switchboardFunction.loadData();
+    const addEnclaveTxn = await addMrEnclave(
+      switchboardProgram,
+      switchboardFunction,
+      functionState
+    );
+    if (addEnclaveTxn) {
+      console.log(
+        `[TX] function_set_config (added MrEnclave): ${addEnclaveTxn}`
+      );
+    }
   } catch (error) {
     if (!`${error}`.includes("Account does not exist or has no data")) {
       throw error;

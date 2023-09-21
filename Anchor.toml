@@ -13,7 +13,7 @@ switchboard_randomness_callback = "5bKuRru1qgEeQUXSAJvsXc8hZEGpCucEaaDQkmyd8j6v"
 scheduled_lottery_request = "6AKXZiKbmj3D45bDZpa9fo6vUV4qGeeeRCZ5qRhE4Ve4"
 
 [provider]
-cluster = "Localnet"
+cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

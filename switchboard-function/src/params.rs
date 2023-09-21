@@ -61,7 +61,7 @@ mod tests {
     #[test]
     fn test_params_decode() {
         let request_params_string = format!(
-            "PID={},MIN_GUESS={},MAX_GUESS={},USER={}",
+            "PID={},MIN_RESULT={},MAX_RESULT={},USER={}",
             anchor_spl::token::ID,
             1,
             6,

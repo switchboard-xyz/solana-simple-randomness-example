@@ -8,16 +8,11 @@ import { SwitchboardRandomnessCallback } from "../target/types/switchboard_rando
 import { parseRawMrEnclave } from "@switchboard-xyz/common";
 import fs from "fs";
 import dotenv from "dotenv";
+import { myMrEnclave } from "./utils";
 dotenv.config();
 
-const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
-  ? parseRawMrEnclave(process.env.MR_ENCLAVE)
-  : fs.existsSync("measurement.txt")
-  ? parseRawMrEnclave(fs.readFileSync("measurement.txt", "utf-8").trim())
-  : undefined;
-
 (async () => {
-  if (!MrEnclave) {
+  if (!myMrEnclave) {
     throw new Error(
       `Failed to read MrEnclave value from measurement.txt. Try running 'make build' to generate the measurement`
     );
@@ -60,14 +55,14 @@ const MrEnclave: Uint8Array | undefined = process.env.MR_ENCLAVE
   );
   // if we need to, add MrEnclave measurement
   const mrEnclaveIdx = functionMrEnclaves.findIndex(
-    (b) => Buffer.compare(Buffer.from(b), Buffer.from(MrEnclave)) === 0
+    (b) => Buffer.compare(Buffer.from(b), Buffer.from(myMrEnclave)) === 0
   );
   if (mrEnclaveIdx === -1) {
     console.log(
       `MrEnclave missing from Function, adding to function config ...`
     );
     // we need to add the MrEnclave measurement
-    const mrEnclavesLen = functionMrEnclaves.push(Array.from(MrEnclave));
+    const mrEnclavesLen = functionMrEnclaves.push(Array.from(myMrEnclave));
     if (mrEnclavesLen > 32) {
       functionMrEnclaves = functionMrEnclaves.slice(32 - mrEnclavesLen);
     }

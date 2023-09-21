@@ -201,6 +201,7 @@ interface CostReceipt {
     switchboardProgram,
     switchboardRequestKeypair.publicKey
   );
+  console.log(`Request account: ${switchboardRequestKeypair.publicKey}`);
 
   const {
     data: [event, slot],

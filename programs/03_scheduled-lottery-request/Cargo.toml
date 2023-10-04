@@ -17,5 +17,5 @@ default = []
 
 [dependencies]
 anchor-spl = "0.28.0"
-# switchboard-solana = { version = "0.28.29", path = "../../../sbv3/rust/switchboard-solana" }
-switchboard-solana = "0.28.29"
+# switchboard-solana = { version = "0.28.30", path = "../../../sbv3/rust/switchboard-solana" }
+switchboard-solana = "0.28.30"

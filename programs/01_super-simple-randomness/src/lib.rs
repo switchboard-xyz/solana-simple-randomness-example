@@ -47,7 +47,7 @@ pub struct UserState {
 pub mod super_simple_randomness {
     use super::*;
 
-    pub fn guess(ctx: Context<Guess>, guess: u32) -> Result<()> {
+    pub fn guess(ctx: Context<Guess>, guess: u32) -> anchor_lang::Result<()> {
         if ctx.accounts.user.request_timestamp > 0
             && ctx.accounts.user.settled_timestamp == 0
             && Clock::get()?.unix_timestamp - ctx.accounts.user.request_timestamp < REQUEST_TIMEOUT
@@ -130,7 +130,7 @@ pub mod super_simple_randomness {
         Ok(())
     }
 
-    pub fn settle(ctx: Context<Settle>, result: u32) -> Result<()> {
+    pub fn settle(ctx: Context<Settle>, result: u32) -> anchor_lang::Result<()> {
         if !(MIN_RESULT..MAX_RESULT).contains(&result) {
             return Err(error!(SimpleRandomnessError::RandomResultOutOfBounds));
         }
@@ -146,6 +146,8 @@ pub mod super_simple_randomness {
 
         emit!(UserGuessSettled {
             user: ctx.accounts.user.key(),
+            user_guess: ctx.accounts.user.guess,
+            result: ctx.accounts.user.result,
             user_won: ctx.accounts.user.result == ctx.accounts.user.guess,
             request_timestamp: ctx.accounts.user.request_timestamp,
             settled_timestamp: ctx.accounts.user.settled_timestamp
@@ -158,6 +160,8 @@ pub mod super_simple_randomness {
 #[event]
 pub struct UserGuessSettled {
     pub user: Pubkey,
+    pub user_guess: u32,
+    pub result: u32,
     pub user_won: bool,
     pub request_timestamp: i64,
     pub settled_timestamp: i64,

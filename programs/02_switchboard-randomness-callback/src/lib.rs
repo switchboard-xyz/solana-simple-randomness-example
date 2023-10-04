@@ -35,7 +35,7 @@ pub const REQUEST_TIMEOUT: i64 = 60;
 pub mod switchboard_randomness_callback {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> anchor_lang::Result<()> {
         let mut program_state = ctx.accounts.program_state.load_init()?;
 
         program_state.bump = *ctx.bumps.get("program_state").unwrap();
@@ -45,7 +45,7 @@ pub mod switchboard_randomness_callback {
         Ok(())
     }
 
-    pub fn create_user(ctx: Context<CreateUser>) -> Result<()> {
+    pub fn create_user(ctx: Context<CreateUser>) -> anchor_lang::prelude::Result<()> {
         // Verify this exists
         let _program_state = ctx.accounts.program_state.load()?;
 
@@ -94,7 +94,7 @@ pub mod switchboard_randomness_callback {
         Ok(())
     }
 
-    pub fn guess(ctx: Context<Guess>, guess: u32) -> Result<()> {
+    pub fn guess(ctx: Context<Guess>, guess: u32) -> anchor_lang::Result<()> {
         if ctx.accounts.user.load()?.request_timestamp > 0
             && ctx.accounts.user.load()?.settled_timestamp == 0
             && Clock::get()?.unix_timestamp - ctx.accounts.user.load()?.request_timestamp
@@ -154,7 +154,7 @@ pub mod switchboard_randomness_callback {
         Ok(())
     }
 
-    pub fn settle(ctx: Context<Settle>, result: u32) -> Result<()> {
+    pub fn settle(ctx: Context<Settle>, result: u32) -> anchor_lang::Result<()> {
         if !(MIN_RESULT..MAX_RESULT).contains(&result) {
             return Err(error!(SimpleRandomnessError::RandomResultOutOfBounds));
         }
@@ -171,6 +171,8 @@ pub mod switchboard_randomness_callback {
 
         emit!(UserGuessSettled {
             user: ctx.accounts.user.key(),
+            user_guess: user.guess,
+            result: user.result,
             user_won: user.result == user.guess,
             request_timestamp: user.request_timestamp,
             settled_timestamp: user.settled_timestamp
@@ -179,7 +181,7 @@ pub mod switchboard_randomness_callback {
         Ok(())
     }
 
-    pub fn close(ctx: Context<Close>) -> Result<()> {
+    pub fn close(ctx: Context<Close>) -> anchor_lang::Result<()> {
         let user_bump = ctx.accounts.user.load()?.bump;
 
         // Close the Switchboard request account and its associated token wallet.
@@ -213,6 +215,8 @@ pub mod switchboard_randomness_callback {
 #[event]
 pub struct UserGuessSettled {
     pub user: Pubkey,
+    pub user_guess: u32,
+    pub result: u32,
     pub user_won: bool,
     pub request_timestamp: i64,
     pub settled_timestamp: i64,

@@ -3115,7 +3115,7 @@ name = "scheduled-lottery-request"
 version = "0.1.0"
 dependencies = [
  "anchor-spl",
- "switchboard-solana 0.28.21",
+ "switchboard-solana",
 ]
 
 [[package]]
@@ -4256,7 +4256,7 @@ name = "super-simple-randomness"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
- "switchboard-solana 0.28.21 (registry+https://github.com/rust-lang/crates.io-index)",
+ "switchboard-solana",
 ]
 
 [[package]]
@@ -4267,22 +4267,9 @@ checksum = "ab16ced94dbd8a46c82fd81e3ed9a8727dac2977ea869d217bcc4ea1f122e81f"
 
 [[package]]
 name = "switchboard-common"
-version = "0.8.20"
-dependencies = [
- "envy",
- "getrandom 0.2.10",
- "hex",
- "serde",
- "serde_json",
- "sgx-quote",
- "sha2 0.10.7",
-]
-
-[[package]]
-name = "switchboard-common"
-version = "0.8.20"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfd44010d7cc59eb0d70c2547b3f5ad144bac1cccf6bdcdb390efaf95cee9aae"
+checksum = "6998981e774145df115f109475a0997752d6ecf142298ab71c8ccaeb73d2984a"
 dependencies = [
  "envy",
  "getrandom 0.2.10",
@@ -4297,37 +4284,14 @@ dependencies = [
 name = "switchboard-randomness-callback"
 version = "0.1.0"
 dependencies = [
- "switchboard-solana 0.28.21 (registry+https://github.com/rust-lang/crates.io-index)",
+ "switchboard-solana",
 ]
 
 [[package]]
 name = "switchboard-solana"
-version = "0.28.21"
-dependencies = [
- "anchor-client",
- "anchor-lang",
- "anchor-spl",
- "bincode",
- "bytemuck",
- "chrono",
- "cron",
- "hex",
- "rust_decimal",
- "sgx-quote",
- "solana-address-lookup-table-program",
- "solana-client",
- "solana-program",
- "superslice",
- "switchboard-common 0.8.20",
- "tokio",
- "url",
-]
-
-[[package]]
-name = "switchboard-solana"
-version = "0.28.21"
+version = "0.28.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5470816a1cea4cbf0075afff853ee1a70570b3dca74f4f465127de902697ea1a"
+checksum = "bcae2502d5ec73285dd855486ff54d9f169fbee8c8ab355ac74a7f809782e275"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -4343,7 +4307,7 @@ dependencies = [
  "solana-client",
  "solana-program",
  "superslice",
- "switchboard-common 0.8.20 (registry+https://github.com/rust-lang/crates.io-index)",
+ "switchboard-common",
  "tokio",
  "url",
 ]

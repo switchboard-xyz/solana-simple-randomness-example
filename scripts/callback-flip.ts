@@ -22,6 +22,8 @@ dotenv.config();
 
 interface UserGuessSettledEvent {
   user: anchor.web3.PublicKey;
+  userGuess: number;
+  result: number;
   userWon: boolean;
   requestTimestamp: anchor.BN;
   settledTimestamp: anchor.BN;
@@ -44,6 +46,7 @@ interface UserGuessSettledEvent {
 
   const program: anchor.Program<SwitchboardRandomnessCallback> =
     anchor.workspace.SwitchboardRandomnessCallback;
+  console.log(`PROGRAM: ${program.programId}`);
 
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
 

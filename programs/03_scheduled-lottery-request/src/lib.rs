@@ -25,7 +25,7 @@ pub mod scheduled_lottery_request {
 
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> anchor_lang::Result<()> {
         let mut program_state = ctx.accounts.program_state.load_init()?;
 
         program_state.bump = *ctx.bumps.get("program_state").unwrap();
@@ -39,7 +39,7 @@ pub mod scheduled_lottery_request {
         ctx: Context<CreateLottery>,
         entry_fee: u64,
         duration_slots: Option<u32>,
-    ) -> Result<()> {
+    ) -> anchor_lang::Result<()> {
         // Parameters used by the Switchboard Function to determine the lottery winner.
         let request_params = format!("PID={},LOTTERY={}", crate::id(), ctx.accounts.lottery.key(),);
         let container_params = request_params.into_bytes();
@@ -118,7 +118,7 @@ pub mod scheduled_lottery_request {
         Ok(())
     }
 
-    pub fn buy_ticket(ctx: Context<BuyTicket>) -> Result<()> {
+    pub fn buy_ticket(ctx: Context<BuyTicket>) -> anchor_lang::Result<()> {
         if ctx.accounts.lottery.load()?.num_tickets >= MAX_TICKETS as u32 {
             return Err(error!(LotteryError::LotterySoldOut));
         }
@@ -155,7 +155,7 @@ pub mod scheduled_lottery_request {
         Ok(())
     }
 
-    pub fn draw_winner(ctx: Context<DrawWinner>, winner: Pubkey) -> Result<()> {
+    pub fn draw_winner(ctx: Context<DrawWinner>, winner: Pubkey) -> anchor_lang::Result<()> {
         if ctx.accounts.lottery.load()?.has_ended {
             return Err(error!(LotteryError::LotteryAlreadyEnded));
         }

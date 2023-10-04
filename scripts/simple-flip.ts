@@ -23,6 +23,8 @@ dotenv.config();
 
 interface UserGuessSettledEvent {
   user: anchor.web3.PublicKey;
+  userGuess: number;
+  result: number;
   userWon: boolean;
   requestTimestamp: anchor.BN;
   settledTimestamp: anchor.BN;

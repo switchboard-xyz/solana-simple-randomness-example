@@ -6,7 +6,7 @@ pub struct ContainerParams {
 }
 
 impl ContainerParams {
-    pub fn decode(container_params: &Vec<u8>) -> std::result::Result<Self, SwitchboardClientError> {
+    pub fn decode(container_params: &Vec<u8>) -> std::result::Result<Self, SbError> {
         let params = String::from_utf8(container_params.clone()).unwrap();
 
         let mut program_id: Pubkey = Pubkey::default();
@@ -25,12 +25,12 @@ impl ContainerParams {
         }
 
         if program_id == Pubkey::default() {
-            return Err(SwitchboardClientError::CustomMessage(
+            return Err(SbError::CustomMessage(
                 "PID cannot be undefined".to_string(),
             ));
         }
         if lottery_key == Pubkey::default() {
-            return Err(SwitchboardClientError::CustomMessage(
+            return Err(SbError::CustomMessage(
                 "USER_KEY cannot be undefined".to_string(),
             ));
         }

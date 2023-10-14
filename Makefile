@@ -33,7 +33,6 @@ dev: dev_docker_build measurement
 publish: anchor_publish docker_publish measurement
 
 measurement: check_docker_env
-	docker pull --platform=linux/amd64 -q ${DOCKERHUB_IMAGE_NAME}:latest
 	@docker run -d --platform=linux/amd64 -q --name=my-switchboard-function ${DOCKERHUB_IMAGE_NAME}:latest
 	@docker cp my-switchboard-function:/measurement.txt ./measurement.txt
 	@echo -n 'MrEnclve: '

@@ -114,7 +114,7 @@ default container for your program. When you're ready, you can make changes to
 the Switchboard Function and deploy to your own dockerhub organization.
 
 ```bash
-echo 'DOCKERHUB_IMAGE_NAME=gallynaut/solana-simple-randomness-function' > .env
+echo 'DOCKER_IMAGE_NAME=gallynaut/solana-simple-randomness-function' > .env
 ```
 
 ## Super Simple Randomness

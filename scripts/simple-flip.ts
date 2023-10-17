@@ -102,9 +102,9 @@ interface CostReceipt {
     }
   } else {
     // Create a new Switchboard Function
-    if (!process.env.DOCKERHUB_IMAGE_NAME) {
+    if (!process.env.DOCKER_IMAGE_NAME) {
       throw new Error(
-        `You need to set DOCKERHUB_IMAGE_NAME in your .env file to create a new Switchboard Function. Example:\n\tDOCKERHUB_IMAGE_NAME=gallynaut/solana-simple-randomness-function`
+        `You need to set DOCKER_IMAGE_NAME in your .env file to create a new Switchboard Function. Example:\n\tDOCKER_IMAGE_NAME=gallynaut/solana-simple-randomness-function`
       );
     }
 
@@ -120,7 +120,7 @@ interface CostReceipt {
             name: "SIMPLE-RANDOMNESS",
             metadata:
               "https://github.com/switchboard-xyz/solana-simple-randomness-example/tree/main/switchboard-function",
-            container: process.env.DOCKERHUB_IMAGE_NAME,
+            container: process.env.DOCKER_IMAGE_NAME,
             containerRegistry: "dockerhub",
             version: "latest",
             attestationQueue,

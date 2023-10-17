@@ -8,10 +8,10 @@
 DOCKER_IMAGE_NAME ?= gallynaut/solana-simple-randomness-function
 
 check_docker_env:
-ifeq ($(strip $(DOCKERHUB_IMAGE_NAME)),)
-	$(error DOCKERHUB_IMAGE_NAME is not set)
+ifeq ($(strip $(DOCKER_IMAGE_NAME)),)
+	$(error DOCKER_IMAGE_NAME is not set)
 else
-	@echo DOCKERHUB_IMAGE_NAME: ${DOCKERHUB_IMAGE_NAME}
+	@echo DOCKER_IMAGE_NAME: ${DOCKER_IMAGE_NAME}
 endif
 
 # Default make task
@@ -33,7 +33,7 @@ dev: dev_docker_build measurement
 publish: anchor_publish docker_publish measurement
 
 measurement: check_docker_env
-	@docker run -d --platform=linux/amd64 -q --name=my-switchboard-function ${DOCKERHUB_IMAGE_NAME}:latest
+	@docker run -d --platform=linux/amd64 -q --name=my-switchboard-function ${DOCKER_IMAGE_NAME}:latest
 	@docker cp my-switchboard-function:/measurement.txt ./measurement.txt
 	@echo -n 'MrEnclve: '
 	@cat measurement.txt

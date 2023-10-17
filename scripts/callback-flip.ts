@@ -119,7 +119,7 @@ interface UserGuessSettledEvent {
             name: "SIMPLE-RANDOMNESS",
             metadata:
               "https://github.com/switchboard-xyz/solana-simple-randomness-example/tree/main/switchboard-function",
-            container: process.env.DOCKERHUB_IMAGE_NAME,
+            container: process.env.DOCKER_IMAGE_NAME,
             containerRegistry: "dockerhub",
             version: "latest",
             attestationQueue,

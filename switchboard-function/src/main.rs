@@ -3,6 +3,7 @@ use std::str::FromStr;
 pub use switchboard_solana::get_ixn_discriminator;
 pub use switchboard_solana::prelude::*;
 use switchboard_solana::switchboard_function;
+use switchboard_solana::sb_error;
 
 mod params;
 pub use params::*;
@@ -10,8 +11,7 @@ pub use params::*;
 #[switchboard_function]
 pub async fn sb_function(runner: FunctionRunner, params: Vec<u8>) -> Result<Vec<Instruction>, SbFunctionError> {
     // parse and validate user provided request params
-    let params = ContainerParams::decode(&params)
-        .map_err(|_| SbFunctionError::FunctionError(2))?;
+    let params: ContainerParams = ContainerParams::decode(&params).map_err(|_| SbError::ArgParseFail)?;
     // Generate our random result
     let random_result = generate_randomness(params.min_result, params.max_result);
     let mut random_bytes = random_result.to_le_bytes().to_vec();
@@ -38,6 +38,11 @@ pub async fn sb_function(runner: FunctionRunner, params: Vec<u8>) -> Result<Vec<
             AccountMeta::new_readonly(runner.signer, true),
         ],
     }])
+}
+
+#[sb_error]
+pub enum SbError {
+    ArgParseFail,
 }
 
 fn generate_randomness(min: u32, max: u32) -> u32 {

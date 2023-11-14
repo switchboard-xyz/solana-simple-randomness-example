@@ -4635,7 +4635,7 @@ dependencies = [
 
 [[package]]
 name = "switchboard-solana"
-version = "0.28.48"
+version = "0.28.50"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -4668,9 +4668,9 @@ dependencies = [
 
 [[package]]
 name = "switchboard-solana-macros-temp"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "330d3bc5b342fcd9100642db2ed0f0b2186eb268c232d260e9b56e17bd1768f4"
+checksum = "4f3b7a01706f3cdbe2d2c8ffb83ff1e5062595bfb9a8c4ecc4957e0cdb24f851"
 dependencies = [
  "proc-macro2 1.0.66",
  "quote 1.0.33",

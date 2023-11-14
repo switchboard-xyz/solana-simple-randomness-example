@@ -180,6 +180,7 @@ and is shown for demo purposes.
 You should always test your function flows locally to easily view your logs and confirm expected workflows.  To test locally, run
 
 ```bash
+cd switchboard-function
 sb solana function test --parameters "PID=Eg6SrU7y8AbPH8VnofxPYdUuRAAf1Tws3zSGVoSNBuAs,USER=8CkzSyZBAXT7qqrb2z4K4wiDeR9KGFtsBYJJdn8tsRQt,MAX_RESULT=100,MIN_RESULT=1"
 ```
 

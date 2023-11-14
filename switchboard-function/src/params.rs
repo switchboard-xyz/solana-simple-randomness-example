@@ -36,7 +36,7 @@ impl ContainerParams {
         }
         if max_result == 0 {
             return Err(SbError::CustomMessage(
-                "MAX_GUESS must be greater than 0".to_string(),
+                "MAX_RESULT must be greater than 0".to_string(),
             ));
         }
         if user_key == Pubkey::default() {

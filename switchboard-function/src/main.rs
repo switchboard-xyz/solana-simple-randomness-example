@@ -6,21 +6,10 @@ pub use switchboard_solana::prelude::*;
 mod params;
 pub use params::*;
 
-#[tokio::main(worker_threads = 12)]
-async fn main() {
-    // First, initialize the runner instance with a freshly generated Gramine keypair
-    let runner = FunctionRunner::new_from_cluster(Cluster::Devnet, None).unwrap();
-
+#[switchboard_function]
+pub async fn sb_function(runner: FunctionRunner, params: Vec<u8>) -> Result<Vec<Instruction>, SbFunctionError> {
     // parse and validate user provided request params
-    let params = ContainerParams::decode(
-        &runner
-            .function_request_data
-            .as_ref()
-            .unwrap()
-            .container_params,
-    )
-    .unwrap();
-
+    let params = ContainerParams::decode(&params).unwrap();
     // Generate our random result
     let random_result = generate_randomness(params.min_result, params.max_result);
     let mut random_bytes = random_result.to_le_bytes().to_vec();
@@ -37,7 +26,7 @@ async fn main() {
     // 2. Switchboard Function
     // 3. Switchboard Function Request
     // 4. Enclave Signer (signer): our Gramine generated keypair
-    let settle_ixn = Instruction {
+    Ok(vec![Instruction {
         program_id: params.program_id,
         data: ixn_data,
         accounts: vec![
@@ -46,15 +35,7 @@ async fn main() {
             AccountMeta::new_readonly(runner.function_request_key.unwrap(), false),
             AccountMeta::new_readonly(runner.signer, true),
         ],
-    };
-
-    // Then, write your own Rust logic and build a Vec of instructions.
-    // Should  be under 700 bytes after serialization
-    let ixs: Vec<solana_program::instruction::Instruction> = vec![settle_ixn];
-
-    // Finally, emit the signed quote and partially signed transaction to the functionRunner oracle
-    // The functionRunner oracle will use the last outputted word to stdout as the serialized result. This is what gets executed on-chain.
-    runner.emit(ixs).await.unwrap();
+    }])
 }
 
 fn generate_randomness(min: u32, max: u32) -> u32 {

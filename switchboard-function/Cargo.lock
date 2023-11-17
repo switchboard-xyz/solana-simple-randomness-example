@@ -4613,6 +4613,8 @@ dependencies = [
 [[package]]
 name = "switchboard-common"
 version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b42a22f6cd7222f3d25cd18738960666b8aff14f1d6266385569bbde8386199"
 dependencies = [
  "async-trait",
  "base64 0.21.5",
@@ -4636,6 +4638,8 @@ dependencies = [
 [[package]]
 name = "switchboard-solana"
 version = "0.28.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90a655072a80417cd06a810488922de5b3de5106cde9cce815846ed1e4589456"
 dependencies = [
  "anchor-client",
  "anchor-lang",

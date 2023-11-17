@@ -17,8 +17,8 @@ scheduled_lottery_request = "6AKXZiKbmj3D45bDZpa9fo6vUV4qGeeeRCZ5qRhE4Ve4"
 # wallet = "~/.config/solana/id.json"
 
 cluster = "Devnet"
-wallet = "~/.config/solana/id.json"
-# wallet = "~/switchboard_environments_v2/devnet/upgrade_authority/upgrade_authority.json"
+# wallet = "~/.config/solana/id.json"
+wallet = "~/switchboard_environments_v2/devnet/upgrade_authority/upgrade_authority.json"
 
 # cluster = "Mainnet"
 # wallet = "~/switchboard_environments_v2/mainnet/upgrade_authority/upgrade_authority.json"

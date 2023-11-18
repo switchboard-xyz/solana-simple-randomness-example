@@ -176,14 +176,6 @@ request_init_ctx.invoke(
 account if it doesnt already exist. This feature should be avoided if possible
 and is shown for demo purposes.
 
-### Testing
-You should always test your function flows locally to easily view your logs and confirm expected workflows.  To test locally, run
-
-```bash
-cd switchboard-function
-sb solana function test --parameters "PID=Eg6SrU7y8AbPH8VnofxPYdUuRAAf1Tws3zSGVoSNBuAs,USER=8CkzSyZBAXT7qqrb2z4K4wiDeR9KGFtsBYJJdn8tsRQt,MAX_RESULT=100,MIN_RESULT=1"
-```
-
 ### Usage
 
 Set the anchor program IDs to your local keypairs so you can deploy this
@@ -209,6 +201,15 @@ make simple-flip
 # OR
 anchor run simple-flip
 ```
+
+### Testing Locally
+You should always test your function flows locally to easily view your logs and confirm expected workflows.  To test locally, run
+
+```bash
+cd switchboard-function
+sb solana function test --parameters "PID=${PID?},USER=${USER?},MAX_RESULT=10,MIN_RESULT=1"
+```
+
 
 ## Switchboard Randomness Callback
 

@@ -8,10 +8,25 @@ use switchboard_solana::sb_error;
 mod params;
 pub use params::*;
 
+mod secret;
+pub use secret::*;
+
 #[switchboard_function]
-pub async fn sb_function(runner: FunctionRunner, params: Vec<u8>) -> Result<Vec<Instruction>, SbFunctionError> {
+pub async fn sb_function(
+    runner: FunctionRunner,
+    params: Vec<u8>
+) -> Result<Vec<Instruction>, SbFunctionError> {
+    // SECRET FETCH:
+    // Fetch a secret from Switchboard's secret server.
+    // let secret: ContainerSecret = ContainerSecret::fetch(
+    //     runner.function_data.unwrap().authority.to_string().as_str(),
+    //     "SECRET_NAME".as_str()
+    // ).map_err(|_| SbError::SecretFetchFail)?;
+
     // parse and validate user provided request params
-    let params: ContainerParams = ContainerParams::decode(&params).map_err(|_| SbError::ArgParseFail)?;
+    let params: ContainerParams = ContainerParams::decode(&params).map_err(
+        |_| SbError::ArgParseFail
+    )?;
     // Generate our random result
     let random_result = generate_randomness(params.min_result, params.max_result);
     let mut random_bytes = random_result.to_le_bytes().to_vec();
@@ -28,21 +43,24 @@ pub async fn sb_function(runner: FunctionRunner, params: Vec<u8>) -> Result<Vec<
     // 2. Switchboard Function
     // 3. Switchboard Function Request
     // 4. Enclave Signer (signer): our Gramine generated keypair
-    Ok(vec![Instruction {
-        program_id: params.program_id,
-        data: ixn_data,
-        accounts: vec![
-            AccountMeta::new(params.user_key, false),
-            AccountMeta::new_readonly(runner.function, false),
-            AccountMeta::new_readonly(runner.function_request_key.unwrap(), false),
-            AccountMeta::new_readonly(runner.signer, true),
-        ],
-    }])
+    Ok(
+        vec![Instruction {
+            program_id: params.program_id,
+            data: ixn_data,
+            accounts: vec![
+                AccountMeta::new(params.user_key, false),
+                AccountMeta::new_readonly(runner.function, false),
+                AccountMeta::new_readonly(runner.function_request_key.unwrap(), false),
+                AccountMeta::new_readonly(runner.signer, true)
+            ],
+        }]
+    )
 }
 
 #[sb_error]
 pub enum SbError {
     ArgParseFail,
+    SecretFetchFail,
 }
 
 fn generate_randomness(min: u32, max: u32) -> u32 {
@@ -54,7 +72,7 @@ fn generate_randomness(min: u32, max: u32) -> u32 {
     }
 
     // We add one so its inclusive [min, max]
-    let window = (max + 1) - min;
+    let window = max + 1 - min;
 
     let mut bytes: [u8; 4] = [0u8; 4];
     Gramine::read_rand(&mut bytes).expect("gramine failed to generate randomness");

@@ -1,7 +1,7 @@
 use crate::*;
 use rand::rngs::OsRng;
 use reqwest;
-use rsa::{ pkcs8::ToPublicKey, PaddingScheme, RsaPrivateKey, RsaPublicKey };
+use rsa::{pkcs8::ToPublicKey, PaddingScheme, RsaPrivateKey, RsaPublicKey};
 use serde_json::json;
 
 pub struct ContainerSecret {
@@ -20,21 +20,19 @@ impl ContainerSecret {
         let secrets_quote = Gramine::generate_quote(pub_key).map_err(|_| SbError::SgxError)?;
 
         // Request the secret
-        let payload =
-            json!({
+        let payload = json!({
             "quote": &secrets_quote,
             "user_pubkey": user_pubkey,
             "secret_name": secret_name,
         });
-        let res = reqwest::Client
-            ::new()
+        let res = reqwest::Client::new()
             .get("https://api.secrets.switchboard.xyz/")
             .json(&payload)
-            .send().await
-            .map_err(|_| SbError::NetworkError)?;
-
-        return Err(
-            SbError::CustomMessage("Need to parse out value from http response.".to_string())
-        );
+            .send()
+            .await
+            .map_err(|_| SbError::NetworkError)
+            .unwrap();
+        let value = res.json().await.unwrap();
+        return Ok(Self { value });
     }
 }

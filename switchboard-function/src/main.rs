@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
+pub use kv_log_macro::info;
 pub use switchboard_solana::get_ixn_discriminator;
 pub use switchboard_solana::prelude::*;
-use switchboard_solana::switchboard_function;
 use switchboard_solana::sb_error;
+use switchboard_solana::switchboard_function;
 
 mod params;
 pub use params::*;
@@ -14,19 +15,21 @@ pub use secret::*;
 #[switchboard_function]
 pub async fn sb_function(
     runner: FunctionRunner,
-    params: Vec<u8>
+    params: Vec<u8>,
 ) -> Result<Vec<Instruction>, SbFunctionError> {
     // SECRET FETCH:
+    let user_pubkey = runner.function_data.unwrap().authority.to_string();
+    let secret_name = "SECRET_NAME";
+    info!("Fetching secret: {}", secret_name);
     // Fetch a secret from Switchboard's secret server.
-    // let secret: ContainerSecret = ContainerSecret::fetch(
-    //     runner.function_data.unwrap().authority.to_string().as_str(),
-    //     "SECRET_NAME".as_str()
-    // ).map_err(|_| SbError::SecretFetchFail)?;
+    let secret = ContainerSecret::fetch(user_pubkey.as_str(), secret_name)
+        .await
+        .map_err(|_| SbError::SecretFetchFail)?;
+    info!("Secret fetched: {}", secret.value);
 
     // parse and validate user provided request params
-    let params: ContainerParams = ContainerParams::decode(&params).map_err(
-        |_| SbError::ArgParseFail
-    )?;
+    let params: ContainerParams =
+        ContainerParams::decode(&params).map_err(|_| SbError::ArgParseFail)?;
     // Generate our random result
     let random_result = generate_randomness(params.min_result, params.max_result);
     let mut random_bytes = random_result.to_le_bytes().to_vec();
@@ -43,18 +46,16 @@ pub async fn sb_function(
     // 2. Switchboard Function
     // 3. Switchboard Function Request
     // 4. Enclave Signer (signer): our Gramine generated keypair
-    Ok(
-        vec![Instruction {
-            program_id: params.program_id,
-            data: ixn_data,
-            accounts: vec![
-                AccountMeta::new(params.user_key, false),
-                AccountMeta::new_readonly(runner.function, false),
-                AccountMeta::new_readonly(runner.function_request_key.unwrap(), false),
-                AccountMeta::new_readonly(runner.signer, true)
-            ],
-        }]
-    )
+    Ok(vec![Instruction {
+        program_id: params.program_id,
+        data: ixn_data,
+        accounts: vec![
+            AccountMeta::new(params.user_key, false),
+            AccountMeta::new_readonly(runner.function, false),
+            AccountMeta::new_readonly(runner.function_request_key.unwrap(), false),
+            AccountMeta::new_readonly(runner.signer, true),
+        ],
+    }])
 }
 
 #[sb_error]

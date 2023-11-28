@@ -1,4 +1,5 @@
 use crate::*;
+use kv_log_macro::error;
 use rand::rngs::OsRng;
 use reqwest;
 use rsa::{pkcs8::ToPublicKey, PaddingScheme, RsaPrivateKey, RsaPublicKey};
@@ -10,6 +11,11 @@ pub struct ContainerSecret {
 
 fn handle_reqwest_err(e: reqwest::Error) -> SbError {
     let status = e.status().unwrap_or(reqwest::StatusCode::default());
+    error!(
+        "reqwest_error: code = {}, message = {}",
+        status,
+        status.canonical_reason().unwrap_or("Unknown")
+    );
     SbError::CustomError {
         message: format!(
             "reqwest_error: code = {}, message = {}",

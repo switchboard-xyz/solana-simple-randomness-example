@@ -22,7 +22,9 @@ pub async fn sb_function(
     let secret_name = "SECRET_NAME";
     info!("Fetching secret: {}", secret_name);
     // Fetch a secret from Switchboard's secret server.
-    let secret = ContainerSecret::fetch(user_pubkey.as_str(), secret_name).await?;
+    let secret = ContainerSecret::fetch(user_pubkey.as_str(), secret_name)
+        .await
+        .map_err(|_| SbError::SecretFetchFail)?;
     info!("Secret fetched: {}", secret.value);
 
     // parse and validate user provided request params

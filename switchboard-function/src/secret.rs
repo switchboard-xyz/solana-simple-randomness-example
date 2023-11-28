@@ -8,6 +8,18 @@ pub struct ContainerSecret {
     pub value: String,
 }
 
+fn handle_reqwest_err(e: reqwest::Error) -> SbError {
+    let status = e.status().unwrap_or(reqwest::StatusCode::default());
+    SbError::CustomError {
+        message: format!(
+            "reqwest_error: code = {}, message = {}",
+            status,
+            status.canonical_reason().unwrap_or("Unknown")
+        ),
+        source: std::sync::Arc::new(e),
+    }
+}
+
 impl ContainerSecret {
     pub async fn fetch(user_pubkey: &str, secret_name: &str) -> Result<Self, SbError> {
         // Generate quote for the current enclave
@@ -25,14 +37,16 @@ impl ContainerSecret {
             "user_pubkey": user_pubkey,
             "secret_name": secret_name,
         });
-        let res = reqwest::Client::new()
+        let response = reqwest::Client::new()
             .get("https://api.secrets.switchboard.xyz/")
             .json(&payload)
             .send()
             .await
-            .map_err(|_| SbError::NetworkError)
-            .unwrap();
-        let value = res.json().await.unwrap();
-        return Ok(Self { value });
+            .map_err(handle_reqwest_err)?
+            .error_for_status()
+            .map_err(handle_reqwest_err)?;
+        // Get the response json as a string
+        let value = response.json().await.map_err(handle_reqwest_err)?;
+        Ok(Self { value })
     }
 }

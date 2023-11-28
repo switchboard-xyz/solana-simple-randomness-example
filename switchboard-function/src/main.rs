@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-pub use kv_log_macro::info;
+use kv_log_macro::info;
 pub use switchboard_solana::get_ixn_discriminator;
 pub use switchboard_solana::prelude::*;
 use switchboard_solana::sb_error;
@@ -22,9 +22,7 @@ pub async fn sb_function(
     let secret_name = "SECRET_NAME";
     info!("Fetching secret: {}", secret_name);
     // Fetch a secret from Switchboard's secret server.
-    let secret = ContainerSecret::fetch(user_pubkey.as_str(), secret_name)
-        .await
-        .map_err(|_| SbError::SecretFetchFail)?;
+    let secret = ContainerSecret::fetch(user_pubkey.as_str(), secret_name).await?;
     info!("Secret fetched: {}", secret.value);
 
     // parse and validate user provided request params

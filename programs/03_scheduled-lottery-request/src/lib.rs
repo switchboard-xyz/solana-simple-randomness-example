@@ -287,7 +287,7 @@ pub struct Initialize<'info> {
     #[account(
         constraint =
             // Ensure custom requests are allowed
-            !switchboard_function.load()?.requests_disabled
+            switchboard_function.load()?.requests_disabled == 0
     )]
     pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
 
@@ -346,7 +346,7 @@ pub struct CreateLottery<'info> {
         mut,
         constraint =
             // Ensure custom requests are allowed
-            !switchboard_function.load()?.requests_disabled
+            switchboard_function.load()?.requests_disabled == 0
     )]
     pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
     // The Switchboard Function Request account we will create with a CPI.
@@ -420,7 +420,7 @@ pub struct DrawWinner<'info> {
     #[account(
         mut,
         constraint = switchboard_request.validate_signer(
-            &switchboard_function.to_account_info(),
+            &switchboard_function,
             &enclave_signer.to_account_info()
             )?
         )]

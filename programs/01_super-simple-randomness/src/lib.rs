@@ -235,7 +235,7 @@ pub struct Settle<'info> {
     pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
     #[account(
     constraint = switchboard_request.validate_signer(
-        &switchboard_function.to_account_info(),
+        &switchboard_function,
         &enclave_signer.to_account_info()
         )?
     )]

@@ -11,7 +11,7 @@ pub use params::*;
 #[switchboard_function]
 pub async fn sb_function(runner: FunctionRunner, params: Vec<u8>) -> Result<Vec<Instruction>, SbFunctionError> {
     // parse and validate user provided request params
-    let params: ContainerParams = ContainerParams::decode(&params).map_err(|_| SbError::ArgParseFail)?;
+    let params: ContainerParams = ContainerParams::decode(&params).map_err(|_| Error::ArgParseFail)?;
     // Generate our random result
     let random_result = generate_randomness(params.min_result, params.max_result);
     let mut random_bytes = random_result.to_le_bytes().to_vec();
@@ -41,7 +41,7 @@ pub async fn sb_function(runner: FunctionRunner, params: Vec<u8>) -> Result<Vec<
 }
 
 #[sb_error]
-pub enum SbError {
+pub enum Error {
     ArgParseFail,
 }
 

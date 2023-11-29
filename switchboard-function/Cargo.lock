@@ -3832,7 +3832,6 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "futures",
- "kv-log-macro",
  "rand 0.8.5",
  "reqwest",
  "rsa",

@@ -1,5 +1,4 @@
 use crate::*;
-use kv_log_macro::error;
 use rand::rngs::OsRng;
 use reqwest;
 use rsa::{pkcs8::ToPublicKey, PaddingScheme, RsaPrivateKey, RsaPublicKey};
@@ -11,7 +10,7 @@ pub struct ContainerSecret {
 
 fn handle_reqwest_err(e: reqwest::Error) -> SbError {
     let status = e.status().unwrap_or(reqwest::StatusCode::default());
-    error!(
+    println!(
         "reqwest_error: code = {}, message = {}",
         status,
         status.canonical_reason().unwrap_or("Unknown")
@@ -39,15 +38,18 @@ impl ContainerSecret {
 
         // Request the secret
         let payload = json!({
-            "quote": &secrets_quote,
             "user_pubkey": user_pubkey,
+            "ciphersuite": "ed25519",
             "secret_name": secret_name,
+            "quote": &secrets_quote,
         });
+        println!("Payload: {}", payload.to_string());
         let response = reqwest::Client::new()
-            .get("https://api.secrets.switchboard.xyz/")
+            .post("https://api.secrets.switchboard.xyz/")
             .json(&payload)
             .send()
-            .await
+            .await;
+        let response = response
             .map_err(handle_reqwest_err)?
             .error_for_status()
             .map_err(handle_reqwest_err)?;

@@ -41,6 +41,7 @@ impl ContainerSecret {
             "user_pubkey": user_pubkey,
             "ciphersuite": "ed25519",
             "secret_name": secret_name,
+            "encryption_key": pub_key,
             "quote": &secrets_quote,
         });
         println!("Payload: {}", payload.to_string());

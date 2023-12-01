@@ -271,12 +271,12 @@ pub struct Initialize<'info> {
     pub authority: AccountInfo<'info>,
 
     // SWITCHBOARD ACCOUNTS
+    // Ensure our authority owns this function
+    // switchboard_function.load()?.authority == *authority.key &&
+    // Ensure custom requests are allowed
     #[account(
         constraint =
-            // Ensure our authority owns this function
-            // switchboard_function.load()?.authority == *authority.key &&
-            // Ensure custom requests are allowed
-            !switchboard_function.load()?.requests_disabled
+            switchboard_function.load()?.requests_disabled == 0
     )]
     pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
 
@@ -405,7 +405,7 @@ pub struct Settle<'info> {
     pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
     #[account(
         constraint = switchboard_request.validate_signer(
-            &switchboard_function.to_account_info(),
+            &switchboard_function,
             &enclave_signer.to_account_info()
             )?
         )]

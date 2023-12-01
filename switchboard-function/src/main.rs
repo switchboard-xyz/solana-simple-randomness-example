@@ -28,7 +28,7 @@ pub async fn sb_function(
 
     // parse and validate user provided request params
     let params: ContainerParams =
-        ContainerParams::decode(&params).map_err(|_| SbError::ArgParseFail)?;
+        ContainerParams::decode(&params).map_err(|_| Error::ArgParseFail)?;
     // Generate our random result
     let random_result = generate_randomness(params.min_result, params.max_result);
     let mut random_bytes = random_result.to_le_bytes().to_vec();
@@ -58,7 +58,7 @@ pub async fn sb_function(
 }
 
 #[sb_error]
-pub enum SbError {
+pub enum Error {
     ArgParseFail,
     SecretFetchFail,
 }

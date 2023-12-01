@@ -1278,6 +1278,19 @@ dependencies = [
 
 [[package]]
 name = "data-encoding"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
+dependencies = [
+ "cfg-if",
+ "hashbrown 0.14.0",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
+name = "data-encoding"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
@@ -1560,6 +1573,15 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 [[package]]
 name = "erased-serde"
 version = "0.3.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c138974f9d5e7fe373eb04df7cae98833802ae4b11c24ac7039a21d5af4b26c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "errno"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c138974f9d5e7fe373eb04df7cae98833802ae4b11c24ac7039a21d5af4b26c"
 dependencies = [
@@ -5103,9 +5125,9 @@ dependencies = [
 
 [[package]]
 name = "switchboard-common"
-version = "0.10.6"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01a253e513f65e8a989227e33db9f8f98fd07811bd60b32adec7005ab00f7af4"
+checksum = "b26494bcb327187cc56f836a13188b02bfecadcf267923286cca7af78490b239"
 dependencies = [
  "async-trait",
  "base64 0.21.5",
@@ -5113,18 +5135,12 @@ dependencies = [
  "futures",
  "getrandom 0.2.10",
  "hex",
- "ipfs-api-backend-hyper",
- "ipfs-api-prelude",
- "libc",
  "log",
- "proc-macro2 1.0.66",
- "quote 1.0.33",
  "serde",
  "serde_json",
  "sgx-quote",
  "sha2 0.10.7",
  "sha3 0.10.8",
- "syn 2.0.32",
 ]
 
 [[package]]
@@ -5136,9 +5152,9 @@ dependencies = [
 
 [[package]]
 name = "switchboard-solana"
-version = "0.28.50"
+version = "0.28.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90a655072a80417cd06a810488922de5b3de5106cde9cce815846ed1e4589456"
+checksum = "800b971b755f2425f5c3bf75eaec1475a951f9e38c26803278f5b26f867d55bc"
 dependencies = [
  "anchor-client",
  "anchor-lang",
@@ -5721,12 +5737,6 @@ dependencies = [
  "sval_ref",
  "sval_serde",
 ]
-
-[[package]]
-name = "vcpkg"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vec_map"

@@ -4,7 +4,7 @@ use reqwest;
 use rsa::{pkcs8::ToPublicKey, PaddingScheme, RsaPrivateKey, RsaPublicKey};
 use serde_json::json;
 
-pub struct ContainerSecret {
+pub struct SwitchboardSecret {
     pub value: String,
 }
 
@@ -25,26 +25,26 @@ fn handle_reqwest_err(e: reqwest::Error) -> SbError {
     }
 }
 
-impl ContainerSecret {
+impl SwitchboardSecret {
     pub async fn fetch(user_pubkey: &str, secret_name: &str) -> Result<Self, SbError> {
-        // Generate quote for the current enclave
+        // Generate quote for this request and pass along a public key with your request.
         let mut os_rng = OsRng::default();
         let priv_key = RsaPrivateKey::new(&mut os_rng, 2048).map_err(|_| SbError::KeyParseError)?;
         let pub_key = RsaPublicKey::from(&priv_key)
             .to_public_key_der()
             .map_err(|_| SbError::KeyParseError)?;
-        let pub_key: &[u8] = pub_key.as_ref();
-        let secrets_quote = Gramine::generate_quote(pub_key).map_err(|_| SbError::SgxError)?;
-
-        // Request the secret
+        // The quote is generated with the public encryption key so that the server can validate
+        // that the request has not been tampered with.
+        let secrets_quote =
+            Gramine::generate_quote(pub_key.as_ref()).map_err(|_| SbError::SgxError)?;
+        // Request the encrypted secret.
         let payload = json!({
             "user_pubkey": user_pubkey,
             "ciphersuite": "ed25519",
             "secret_name": secret_name,
-            "encryption_key": pub_key,
+            "encryption_key": pub_key.to_pem().as_str(),
             "quote": &secrets_quote,
         });
-        println!("Payload: {}", payload.to_string());
         let response = reqwest::Client::new()
             .post("https://api.secrets.switchboard.xyz/")
             .json(&payload)
@@ -54,8 +54,34 @@ impl ContainerSecret {
             .map_err(handle_reqwest_err)?
             .error_for_status()
             .map_err(handle_reqwest_err)?;
-        // Get the response json as a string
-        let value = response.json().await.map_err(handle_reqwest_err)?;
-        Ok(Self { value })
+        // Our encrypted response is encoded as a base64 string.
+        let encrypted: String = response.json().await.map_err(handle_reqwest_err)?;
+        match base64::decode(encrypted) {
+            Ok(encrypted) => {
+                // Decrypt the encrypted response data.
+                let decrypted = match priv_key.decrypt(PaddingScheme::PKCS1v15Encrypt, &encrypted) {
+                    Ok(value) => value,
+                    Err(err) => {
+                        let error_msg = format!("DecryptError: {:#?}", err);
+                        println!("{}", error_msg);
+                        return Err(SbError::CustomMessage(error_msg));
+                    }
+                };
+                // Encode the decrypted data as a UTF8 string and return.
+                match String::from_utf8(decrypted) {
+                    Ok(value) => Ok(Self { value }),
+                    Err(err) => {
+                        let error_msg = format!("{:#?}", err);
+                        println!("{}", error_msg);
+                        return Err(SbError::CustomMessage(error_msg));
+                    }
+                }
+            }
+            Err(err) => {
+                let error_msg = format!("Base64DecodeError: {:#?}", err);
+                println!("{}", error_msg);
+                return Err(SbError::CustomMessage(error_msg));
+            }
+        }
     }
 }

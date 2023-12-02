@@ -3836,6 +3836,7 @@ checksum = "f27f6278552951f1f2b8cf9da965d10969b2efdea95a6ec47987ab46edfe263a"
 name = "simple-randomness-function"
 version = "0.1.0"
 dependencies = [
+ "base64 0.12.3",
  "bytemuck",
  "futures",
  "rand 0.8.5",

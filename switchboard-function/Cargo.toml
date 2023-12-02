@@ -14,6 +14,7 @@ switchboard-solana = { version = "=0.29.71", features = ["macros"] }
 bytemuck = "1.13"
 
 # Secrets Dependencies
+base64 = "*"
 rand = { version = "0.8.5" }
 reqwest = { version = "0.11", features = ["json"] }
 rsa = { version = "0.5.0" }

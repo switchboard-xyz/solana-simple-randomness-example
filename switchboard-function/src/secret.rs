@@ -55,30 +55,28 @@ impl SwitchboardSecret {
             .error_for_status()
             .map_err(handle_reqwest_err)?;
         // Our encrypted response is encoded as a base64 string.
-        let encrypted: String = response.json().await.map_err(handle_reqwest_err)?;
-        match base64::decode(encrypted) {
-            Ok(encrypted) => {
-                // Decrypt the encrypted response data.
-                let decrypted = match priv_key.decrypt(PaddingScheme::PKCS1v15Encrypt, &encrypted) {
-                    Ok(value) => value,
-                    Err(err) => {
-                        let error_msg = format!("DecryptError: {:#?}", err);
-                        println!("{}", error_msg);
-                        return Err(SbError::CustomMessage(error_msg));
-                    }
-                };
-                // Encode the decrypted data as a UTF8 string and return.
-                match String::from_utf8(decrypted) {
-                    Ok(value) => Ok(Self { value }),
-                    Err(err) => {
-                        let error_msg = format!("{:#?}", err);
-                        println!("{}", error_msg);
-                        return Err(SbError::CustomMessage(error_msg));
-                    }
-                }
-            }
+        let encoded: String = response.json().await.map_err(handle_reqwest_err)?;
+        let encrypted = match base64::decode(encoded) {
+            Ok(value) => value,
             Err(err) => {
                 let error_msg = format!("Base64DecodeError: {:#?}", err);
+                println!("{}", error_msg);
+                return Err(SbError::CustomMessage(error_msg));
+            }
+        };
+        let decrypted = match priv_key.decrypt(PaddingScheme::PKCS1v15Encrypt, &encrypted) {
+            Ok(value) => value,
+            Err(err) => {
+                let error_msg = format!("DecryptError: {:#?}", err);
+                println!("{}", error_msg);
+                return Err(SbError::CustomMessage(error_msg));
+            }
+        };
+        // Encode the decrypted data as a UTF8 string and return.
+        match String::from_utf8(decrypted) {
+            Ok(value) => Ok(Self { value }),
+            Err(err) => {
+                let error_msg = format!("FromUtf8Error: {:#?}", err);
                 println!("{}", error_msg);
                 return Err(SbError::CustomMessage(error_msg));
             }

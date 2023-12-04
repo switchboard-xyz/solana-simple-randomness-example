@@ -38,7 +38,8 @@ pub mod switchboard_randomness_callback {
     pub fn initialize(ctx: Context<Initialize>) -> anchor_lang::Result<()> {
         let mut program_state = ctx.accounts.program_state.load_init()?;
 
-        program_state.bump = *ctx.bumps.get("program_state").unwrap();
+        // program_state.bump = *ctx.bumps.get("program_state").unwrap();
+        program_state.bump = ctx.bumps.program_state;
         program_state.authority = *ctx.accounts.authority.key;
         program_state.switchboard_function = ctx.accounts.switchboard_function.key();
 
@@ -87,7 +88,8 @@ pub mod switchboard_randomness_callback {
         )?;
 
         let mut user = ctx.accounts.user.load_init()?;
-        user.bump = *ctx.bumps.get("user").unwrap();
+        // user.bump = *ctx.bumps.get("user").unwrap();
+        user.bump = ctx.bumps.user;
         user.authority = ctx.accounts.authority.key();
         user.switchboard_request = ctx.accounts.switchboard_request.key();
 
@@ -276,6 +278,9 @@ pub struct Initialize<'info> {
     // Ensure custom requests are allowed
     #[account(
         constraint =
+            // Ensure our authority owns this function
+            // switchboard_function.load()?.authority == *authority.key &&
+            // Ensure custom requests are allowed
             switchboard_function.load()?.requests_disabled == 0
     )]
     pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
@@ -403,12 +408,19 @@ pub struct Settle<'info> {
 
     // SWITCHBOARD ACCOUNTS
     pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
+    // #[account(
+    //     constraint =
+    //     switchboard_request.validate_signer(
+    //         &switchboard_function,
+    //         &enclave_signer.to_account_info()
+    //     )?
+    // )]
     #[account(
-        constraint = switchboard_request.validate_signer(
-            &switchboard_function,
+        constraint = switchboard_function.load()?.validate_request(
+            &switchboard_request,
             &enclave_signer.to_account_info()
-            )?
-        )]
+        )?
+    )]
     pub switchboard_request: Box<Account<'info, FunctionRequestAccountData>>,
     pub enclave_signer: Signer<'info>,
 }

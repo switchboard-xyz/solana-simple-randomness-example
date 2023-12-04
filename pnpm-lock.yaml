@@ -9,11 +9,11 @@ dependencies:
     specifier: ^0.28.0
     version: 0.28.0
   '@switchboard-xyz/common':
-    specifier: ^2.3.6
-    version: 2.3.6
+    specifier: ^2.3.9
+    version: 2.3.9
   '@switchboard-xyz/solana.js':
-    specifier: ^3.1.1
-    version: 3.1.1
+    specifier: ^3.1.5
+    version: 3.1.5
   chalk:
     specifier: '4'
     version: 4.1.2
@@ -429,8 +429,8 @@ packages:
       - utf-8-validate
     dev: false
 
-  /@switchboard-xyz/common@2.3.6:
-    resolution: {integrity: sha512-q5cAw9VLbnPdjOPKvzlQzYWdmR8zXip9GvUr8mSaKs2x59ZtSmufpPoMw555vbW6HdfyA18Ix/A1Bboyzj/cXA==}
+  /@switchboard-xyz/common@2.3.9:
+    resolution: {integrity: sha512-Sdr+m1MFzLCNjpPvklazd7BwT/s2g2spfVnhe0dhwc36ONWeObXAALOLMrFJKiLar2wtd+qhclHt5OoBfceFtw==}
     engines: {node: '>=12'}
     dependencies:
       big.js: 6.2.1
@@ -442,15 +442,15 @@ packages:
       yaml: 2.3.2
     dev: false
 
-  /@switchboard-xyz/solana.js@3.1.1:
-    resolution: {integrity: sha512-aeANyjE4AcjNZGVbftbHo24MKiSz+Vk1cUT5vX+Qcn0uVdfOrK0bjQ/ILKnrF921shU9LSQW8KpxraAeXp/uTw==}
+  /@switchboard-xyz/solana.js@3.1.5:
+    resolution: {integrity: sha512-bKNXBw5g7zBbIfLqDim9gAr0KKKNgw3/KgRsVa5/pl1/2JsDPX8dpuv7H0S0p01CaUryu32Lg1mxjN+qznupAg==}
     engines: {node: '>=16.0.0', npm: '>=7.0.0'}
     dependencies:
       '@coral-xyz/anchor': 0.28.0
       '@coral-xyz/borsh': 0.28.0(@solana/web3.js@1.78.5)
       '@solana/spl-token': 0.3.8(@solana/web3.js@1.78.5)
       '@solana/web3.js': 1.78.5
-      '@switchboard-xyz/common': 2.3.6
+      '@switchboard-xyz/common': 2.3.9
       cron-validator: 1.3.1
       cross-fetch: 4.0.0
       dotenv: 16.3.1

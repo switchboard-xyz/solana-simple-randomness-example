@@ -17,5 +17,5 @@ default = []
 
 [dependencies]
 # switchboard-solana = { version = "0.28.30", path = "../../../sbv3/rust/switchboard-solana" }
-switchboard-solana = "0.28.71"
-anchor-lang = { version = "0.28", features = ["init-if-needed"] }
+switchboard-solana = "0.29"
+anchor-lang = { version = "0.29", features = ["init-if-needed"] }

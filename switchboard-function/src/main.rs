@@ -24,7 +24,7 @@ pub async fn sb_function(
     let secret = SwitchboardSecret::fetch(user_pubkey.as_str(), secret_name)
         .await
         .map_err(|_| Error::SecretFetchFail)?;
-    println!("Secret fetched: {}", secret.value);
+    println!("Secret fetched: {:#?}", secret.secrets);
 
     // parse and validate user provided request params
     let params: ContainerParams =

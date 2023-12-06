@@ -8,10 +8,23 @@ use rsa::{pkcs8::ToPublicKey, PaddingScheme, RsaPrivateKey, RsaPublicKey};
 use serde::Deserialize;
 use serde_json::json;
 
+/// Represents encrypted data containing a key, nonce, and data.
+///
+/// This structure holds information necessary for decrypting an AES-encrypted payload.
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
 struct EncryptedData {
+    /// A base64 encoded string containing the key used to decrypt the `data`.
+    ///
+    /// This key is itself encrypted with the request's public key and can be decrypted using the
+    /// corresponding private key.
     key: String,
+    /// An AES nonce needed to decrypt the `data`.
+    ///
+    /// This value is used alongside the key to ensure secure decryption.
     nonce: String,
+    /// The response payload that has been encrypted with AES.
+    ///
+    /// This data can be of any type, but using a binary format is recommended for efficiency.
     data: String,
 }
 
@@ -38,28 +51,29 @@ fn handle_reqwest_err(e: reqwest::Error) -> SbError {
 }
 
 impl SwitchboardSecret {
-    pub async fn fetch(user_pubkey: &str, secret_name: &str) -> Result<Self, SbError> {
-        // Generate quote for this request and pass along a public key with your request.
+    /// Fetch all of a user's secrets that have been whitelisted for the currently running mrEnclave
+    /// value.
+    pub async fn fetch(user_pubkey: &str) -> Result<Self, SbError> {
+        // Generate quote for secure request with user's public key
         let mut os_rng = OsRng::default();
         let priv_key = RsaPrivateKey::new(&mut os_rng, 2048).map_err(|_| SbError::KeyParseError)?;
         let pub_key = RsaPublicKey::from(&priv_key)
             .to_public_key_der()
             .map_err(|_| SbError::KeyParseError)?;
-
         // The quote is generated around the public encryption key so that the server can validate
         // that the request has not been tampered with.
         let secrets_quote =
             Gramine::generate_quote(pub_key.as_ref()).map_err(|_| SbError::SgxError)?;
-        // Request the encrypted secret.
+
+        // Build and send request to fetch encrypted secrets
         let payload = json!({
             "user_pubkey": user_pubkey,
             "ciphersuite": "ed25519",
-            "secret_name": secret_name,
             "encryption_key": pub_key.to_pem().as_str(),
             "quote": &secrets_quote,
         });
         let response = reqwest::Client::new()
-            .post("https://api.secrets.switchboard.xyz/")
+            .post("https://api.secrets.switchboard.xyz/get_secrets_for_quote")
             .json(&payload)
             .send()
             .await
@@ -115,6 +129,7 @@ impl SwitchboardSecret {
             }
         };
 
+        // The data can be parsed into a hashmap and returned.
         let secrets: HashMap<String, String> = serde_json::from_slice(&data)?;
         Ok(Self { secrets })
     }

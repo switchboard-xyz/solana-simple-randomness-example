@@ -18,10 +18,9 @@ pub async fn sb_function(
 ) -> Result<Vec<Instruction>, SbFunctionError> {
     // SECRET FETCH:
     let user_pubkey = runner.function_data.unwrap().authority.to_string();
-    let secret_name = "SECRET_NAME";
-    println!("Fetching secret: {}", secret_name);
+    println!("Fetching secrets for user: {}", user_pubkey);
     // Fetch a secret from Switchboard's secret server.
-    let secret = SwitchboardSecret::fetch(user_pubkey.as_str(), secret_name)
+    let secret = SwitchboardSecret::fetch(user_pubkey.as_str())
         .await
         .map_err(|_| Error::SecretFetchFail)?;
     println!("Secret fetched: {:#?}", secret.secrets);

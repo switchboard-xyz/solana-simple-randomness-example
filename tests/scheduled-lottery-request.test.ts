@@ -51,7 +51,8 @@ describe("scheduled-lottery-request", () => {
   before(async () => {
     [switchboard, switchboardFunction] = await loadSwitchboard(
       provider,
-      MRENCLAVE
+      MRENCLAVE,
+      await provider.connection.getSlot()
     );
   });
 
@@ -178,7 +179,7 @@ describe("scheduled-lottery-request", () => {
       {
         params: {
           observedTime: new anchor.BN(Math.floor(Date.now() / 1000)),
-          isFailure: false,
+          errorCode: 0,
           mrEnclave: Array.from(MRENCLAVE),
           requestSlot: sbRequestState.activeRequest.requestSlot,
           containerParamsHash: sbRequestState.containerParamsHash,

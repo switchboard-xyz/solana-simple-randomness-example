@@ -57,7 +57,8 @@ pub mod super_simple_randomness {
 
         // Initialize user account if needed
         if ctx.accounts.user.bump == 0 {
-            ctx.accounts.user.bump = *ctx.bumps.get("user").unwrap();
+            // ctx.accounts.user.bump = *ctx.bumps.get("user").unwrap();
+            ctx.accounts.user.bump = ctx.bumps.user;
             ctx.accounts.user.authority = ctx.accounts.authority.key();
         }
 
@@ -232,13 +233,13 @@ pub struct Settle<'info> {
     pub user: Account<'info, UserState>,
 
     // SWITCHBOARD ACCOUNTS
-    pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
     #[account(
-    constraint = switchboard_request.validate_signer(
-        &switchboard_function,
-        &enclave_signer.to_account_info()
+        constraint = switchboard_function.load()?.validate_request(
+            &switchboard_request,
+            &enclave_signer.to_account_info()
         )?
     )]
+    pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
     pub switchboard_request: Box<Account<'info, FunctionRequestAccountData>>,
     pub enclave_signer: Signer<'info>,
 }

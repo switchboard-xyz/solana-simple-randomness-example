@@ -10,7 +10,8 @@ import {
 
 export async function loadSwitchboard(
   provider: anchor.AnchorProvider,
-  MRENCLAVE: RawBuffer
+  MRENCLAVE: RawBuffer,
+  recentSlot?: number
 ): Promise<[BootstrappedAttestationQueue, FunctionAccount]> {
   const switchboardProgram = await SwitchboardProgram.fromProvider(provider);
   const switchboard = await AttestationQueueAccount.bootstrapNewQueue(
@@ -21,10 +22,10 @@ export async function loadSwitchboard(
     await switchboard.attestationQueue.account.createFunction({
       name: "test function",
       metadata: "this function handles XYZ for my protocol",
-      schedule: "", // on-demand updates only
       container: "org/container",
       version: "latest",
-      mrEnclave: parseRawBuffer(MRENCLAVE),
+      mrEnclave: parseRawBuffer(MRENCLAVE, 32),
+      recentSlot,
     });
 
   return [switchboard, switchboardFunction];

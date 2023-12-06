@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { SuperSimpleRandomness } from "../target/types/super_simple_randomness";
+import { SwitchboardRandomnessCallback } from "../target/types/switchboard_randomness_callback";
 import {
   AttestationQueueAccount,
   BootstrappedAttestationQueue,
@@ -9,7 +9,8 @@ import {
   SwitchboardProgram,
   attestationTypes,
 } from "@switchboard-xyz/solana.js";
-import { parseRawMrEnclave } from "@switchboard-xyz/common";
+import { parseRawMrEnclave, sleep } from "@switchboard-xyz/common";
+import { assert } from "chai";
 import { loadSwitchboard } from "./utils";
 
 // This value doesnt matter for our tests because we are not validating
@@ -19,18 +20,22 @@ const MRENCLAVE = parseRawMrEnclave(
   true
 );
 
-describe("super-simple-randomness", () => {
+describe("switchboard-randomness-callback", () => {
   const provider = anchor.AnchorProvider.env();
   const payer = (provider.wallet as anchor.Wallet).payer;
 
   anchor.setProvider(provider);
 
   const program = anchor.workspace
-    .SuperSimpleRandomness as Program<SuperSimpleRandomness>;
+    .SwitchboardRandomnessCallback as Program<SwitchboardRandomnessCallback>;
 
-  console.log(`SuperSimpleRandomness PID: ${program.programId}`);
+  console.log(`SwitchboardRandomnessCallback PID: ${program.programId}`);
 
-  // Derive our users pubkey for the randomness program.
+  // Derive our PDAs.
+  const [programStatePubkey] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("SIMPLE_RANDOMNESS")],
+    program.programId
+  );
   const [userPubkey] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("RANDOMNESS_USER"), payer.publicKey.toBytes()],
     program.programId
@@ -52,8 +57,44 @@ describe("super-simple-randomness", () => {
   });
 
   ///////////////////////////////////////////////////////
-  // Submit a guess
+  // Initialize the program and set the Switchboard Function
   ///////////////////////////////////////////////////////
+  it("initialize", async () => {
+    const tx = await program.methods
+      .initialize()
+      .accounts({
+        payer: payer.publicKey,
+        programState: programStatePubkey,
+        authority: payer.publicKey,
+        switchboardFunction: switchboardFunction.publicKey,
+      })
+      .rpc();
+    console.log(`[TX] initialize: ${tx}`);
+  });
+
+  it("create_user", async () => {
+    const tx = await program.methods
+      .createUser()
+      .accounts({
+        payer: payer.publicKey,
+        programState: programStatePubkey,
+        user: userPubkey,
+        authority: payer.publicKey,
+        switchboard: switchboard.program.attestationProgramId,
+        switchboardMint: switchboard.program.mint.address,
+        switchboardState: switchboard.program.attestationProgramState.publicKey,
+        switchboardAttestationQueue: switchboard.attestationQueue.publicKey,
+        switchboardFunction: switchboardFunction.publicKey,
+        switchboardRequest: switchboardRequestKeypair.publicKey,
+        switchboardRequestEscrow: switchboard.program.mint.getAssociatedAddress(
+          switchboardRequestKeypair.publicKey
+        ),
+      })
+      .signers([switchboardRequestKeypair])
+      .rpc();
+    console.log(`[TX] create_user: ${tx}`);
+  });
+
   it("guess", async () => {
     const tx = await program.methods
       .guess(1)
@@ -66,13 +107,10 @@ describe("super-simple-randomness", () => {
         switchboardAttestationQueue: switchboard.attestationQueue.publicKey,
         switchboardFunction: switchboardFunction.publicKey,
         switchboardRequest: switchboardRequestKeypair.publicKey,
-        switchboardRequestEscrow: anchor.utils.token.associatedAddress({
-          mint: switchboard.program.mint.address,
-          owner: switchboardRequestKeypair.publicKey,
-        }),
-        switchboardMint: switchboard.program.mint.address,
+        switchboardRequestEscrow: switchboard.program.mint.getAssociatedAddress(
+          switchboardRequestKeypair.publicKey
+        ),
       })
-      .signers([switchboardRequestKeypair])
       .rpc();
     console.log(`[TX] guess: ${tx}`);
   });

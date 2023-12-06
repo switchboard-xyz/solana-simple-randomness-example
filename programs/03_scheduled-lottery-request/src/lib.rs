@@ -28,7 +28,8 @@ pub mod scheduled_lottery_request {
     pub fn initialize(ctx: Context<Initialize>) -> anchor_lang::Result<()> {
         let mut program_state = ctx.accounts.program_state.load_init()?;
 
-        program_state.bump = *ctx.bumps.get("program_state").unwrap();
+        // program_state.bump = *ctx.bumps.get("program_state").unwrap();
+        program_state.bump = ctx.bumps.program_state;
         program_state.authority = *ctx.accounts.authority.key;
         program_state.switchboard_function = ctx.accounts.switchboard_function.key();
 
@@ -101,12 +102,14 @@ pub mod scheduled_lottery_request {
             &[&[
                 LOTTERY_SEED,
                 ctx.accounts.authority.key().as_ref(),
-                &[*ctx.bumps.get("lottery").unwrap()],
+                // &[*ctx.bumps.get("lottery").unwrap()],
+                &[ctx.bumps.lottery],
             ]],
         )?;
 
         let mut lottery = ctx.accounts.lottery.load_init()?;
-        lottery.bump = *ctx.bumps.get("lottery").unwrap();
+        // lottery.bump = *ctx.bumps.get("lottery").unwrap();
+        lottery.bump = ctx.bumps.lottery;
         lottery.authority = ctx.accounts.authority.key();
         lottery.escrow = ctx.accounts.lottery_escrow.key();
         lottery.switchboard_request = ctx.accounts.switchboard_request.key();
@@ -416,14 +419,21 @@ pub struct DrawWinner<'info> {
         bump = switchboard_state.load()?.bump,
       )]
     pub switchboard_state: AccountLoader<'info, AttestationProgramState>,
-    pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
     #[account(
-        mut,
-        constraint = switchboard_request.validate_signer(
-            &switchboard_function,
+        constraint = switchboard_function.load()?.validate_request(
+            &switchboard_request,
             &enclave_signer.to_account_info()
-            )?
-        )]
+        )?
+    )]
+    pub switchboard_function: AccountLoader<'info, FunctionAccountData>,
+    // #[account(
+    //     mut,
+    //     constraint = switchboard_request.validate_signer(
+    //         &switchboard_function.to_account_info(),
+    //         &enclave_signer.to_account_info()
+    //     )?
+    // )]
+    #[account(mut)]
     pub switchboard_request: Box<Account<'info, FunctionRequestAccountData>>,
     pub enclave_signer: Signer<'info>,
 

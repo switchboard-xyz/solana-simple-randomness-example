@@ -73,7 +73,7 @@ impl SwitchboardSecret {
             "quote": &secrets_quote,
         });
         let response = reqwest::Client::new()
-            .post("https://api.secrets.switchboard.xyz/get_secrets_for_quote")
+            .post("https://api.secrets.switchboard.xyz/")
             .json(&payload)
             .send()
             .await

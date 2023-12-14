@@ -5,7 +5,7 @@
 .PHONY: build clean publish test
 
 # Variables
-DOCKER_IMAGE_NAME ?= gallynaut/solana-simple-randomness-function
+DOCKER_IMAGE_NAME ?= jessupjn/solana-simple-randomness-with-secret-function
 
 check_docker_env:
 ifeq ($(strip $(DOCKER_IMAGE_NAME)),)

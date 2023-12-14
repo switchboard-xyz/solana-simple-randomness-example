@@ -1,5 +1,5 @@
 [workspace]
-members = ["programs/*"]
+members = ["programs/*", "./switchboard-function"]
 
 [profile.release]
 overflow-checks = true
